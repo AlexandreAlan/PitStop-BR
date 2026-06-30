@@ -12,7 +12,7 @@ $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?:
 
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 
-$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.litros, r.valor_pago, r.descricao, v.nome AS veiculo_nome
+$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.valor_pago, r.descricao, v.nome AS veiculo_nome
                   FROM registros r
                   INNER JOIN veiculos v ON v.id = r.veiculo_id
                   WHERE v.usuario_id = :usuario_id'
@@ -89,6 +89,12 @@ require __DIR__ . '/includes/header.php';
                             <?= h((new DateTime($r['data']))->format('d/m/Y')) ?> · <?= number_format((float) $r['km_atual'], 0, ',', '.') ?> km
                             <?php if ($r['litros']): ?> · <?= number_format((float) $r['litros'], 2, ',', '.') ?> L<?php endif; ?>
                         </div>
+                        <?php if ($r['combustivel']): ?>
+                        <div class="text-muted small">
+                            <?= h($r['combustivel']) ?>
+                            <?php if ((float) $r['litros'] > 0): ?> · <?= h(formatarMoeda((float) $r['valor_pago'] / (float) $r['litros'])) ?>/L<?php endif; ?>
+                        </div>
+                        <?php endif; ?>
                         <?php if ($r['descricao']): ?><div class="text-muted small fst-italic"><?= h($r['descricao']) ?></div><?php endif; ?>
                     </div>
                     <div class="text-end">
