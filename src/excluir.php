@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/config/bootstrap.php';
 
+$usuario = exigirLogin();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     die('Método não permitido.');
@@ -15,9 +17,17 @@ if (!$id) {
     die('ID inválido.');
 }
 
-$stmt = $pdo->prepare('DELETE FROM registros WHERE id = :id');
-$stmt->execute([':id' => $id]);
+$stmt = $pdo->prepare(
+    'DELETE r FROM registros r
+     INNER JOIN veiculos v ON v.id = r.veiculo_id
+     WHERE r.id = :id AND v.usuario_id = :usuario_id'
+);
+$stmt->execute([':id' => $id, ':usuario_id' => $usuario['id']]);
 
-flashSet('sucesso', 'Registro excluído.');
+if ($stmt->rowCount() === 0) {
+    flashSet('erro', 'Registro não encontrado.');
+} else {
+    flashSet('sucesso', 'Registro excluído.');
+}
 header('Location: index.php');
 exit;
