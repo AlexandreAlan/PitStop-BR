@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/config/bootstrap.php';
 
+$usuario = exigirLogin();
+
 $erros = [];
 $nome = '';
 $tipo = '';
@@ -21,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$erros) {
-        $stmt = $pdo->prepare('INSERT INTO veiculos (nome, tipo) VALUES (:nome, :tipo)');
-        $stmt->execute([':nome' => $nome, ':tipo' => $tipo]);
+        $stmt = $pdo->prepare('INSERT INTO veiculos (usuario_id, nome, tipo) VALUES (:usuario_id, :nome, :tipo)');
+        $stmt->execute([':usuario_id' => $usuario['id'], ':nome' => $nome, ':tipo' => $tipo]);
 
         flashSet('sucesso', 'Veículo cadastrado com sucesso.');
         header('Location: veiculos.php');
@@ -30,7 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$veiculos = $pdo->query('SELECT id, nome, tipo, criado_em FROM veiculos ORDER BY nome')->fetchAll();
+$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo, criado_em FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
+$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
+$veiculos = $veiculosStmt->fetchAll();
+
 $tituloPagina = 'Veículos — PitStop BR';
 $mostrarVoltar = true;
 require __DIR__ . '/includes/header.php';
@@ -52,11 +57,25 @@ require __DIR__ . '/includes/header.php';
         <?php foreach ($veiculos as $v): ?>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="fw-semibold"><?= h($v['nome']) ?></div>
-                    <div class="text-muted small"><?= h($v['tipo']) ?></div>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi <?= $v['tipo'] === 'Moto' ? 'bi-bicycle' : 'bi-car-front' ?> fs-4 text-muted"></i>
+                    <div>
+                        <div class="fw-semibold"><?= h($v['nome']) ?></div>
+                        <div class="text-muted small"><?= h($v['tipo']) ?></div>
+                    </div>
                 </div>
-                <i class="bi <?= $v['tipo'] === 'Moto' ? 'bi-bicycle' : 'bi-car-front' ?> fs-4 text-muted"></i>
+                <div class="text-end">
+                    <a href="veiculo_editar.php?id=<?= (int) $v['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="veiculo_excluir.php" class="form-excluir-veiculo d-inline">
+                        <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+                        <input type="hidden" name="id" value="<?= (int) $v['id'] ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
         <?php endforeach; ?>
@@ -88,4 +107,5 @@ require __DIR__ . '/includes/header.php';
     </button>
 </form>
 
+<script src="assets/js/veiculos.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
