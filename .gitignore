@@ -3,3 +3,26 @@
 .gemini/
 CLAUDE.md
 GEMINI.md
+
+# Android / build do APK — segredos e artefatos (nunca versionar)
+*.keystore
+*.jks
+android-build/keystore.properties
+android-build/manifest-checksum.txt
+android-build/.gradle/
+android-build/gradle/
+android-build/app/
+android-build/build/
+android-build/*.apk
+android-build/*.aab
+android-build/*.idsig
+android-build/build.gradle
+android-build/settings.gradle
+android-build/gradle.properties
+android-build/gradlew
+android-build/gradlew.bat
+android-build/store_icon.png
+twa-manifest.json
+
+# APK gerado é publicado em src/downloads/, não versionado (binário grande)
+src/downloads/*.apk
