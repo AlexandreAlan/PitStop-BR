@@ -357,3 +357,44 @@ body { padding-bottom: 76px; }
     color: #8a8f98;
     margin-left: .15rem;
 }
+
+/* Página de instalação (APK / PWA) */
+.tab-instalar {
+    display: flex;
+    gap: .4rem;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: .85rem;
+    padding: .3rem;
+}
+
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, .65);
+    padding: .65rem;
+    border-radius: .6rem;
+    font-size: .85rem;
+    font-weight: 600;
+    transition: background-color .15s var(--ps-ease), color .15s var(--ps-ease);
+}
+
+.tab-btn.ativo {
+    background: var(--ps-primary);
+    color: #fff;
+}
+
+.pane-instalar {
+    display: none;
+}
+
+.pane-instalar.ativo {
+    display: block;
+}
+
+.pane-instalar code {
+    background: rgba(var(--ps-shadow-rgb), .06);
+    padding: .1rem .35rem;
+    border-radius: .4rem;
+}
