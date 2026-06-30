@@ -12,7 +12,7 @@ if (!$id) {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.litros, r.valor_pago, r.descricao
+    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.valor_pago, r.descricao
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
      WHERE r.id = :id AND v.usuario_id = :usuario_id'
@@ -29,12 +29,15 @@ $veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario
 $veiculosStmt->execute([':usuario_id' => $usuario['id']]);
 $veiculos = $veiculosStmt->fetchAll();
 
+$combustiveisPermitidos = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
+
 $erros = [];
 $dados = [
     'veiculo_id'    => (string) $registro['veiculo_id'],
     'data'          => $registro['data'],
     'km_atual'      => (string) $registro['km_atual'],
     'tipo_registro' => $registro['tipo_registro'],
+    'combustivel'   => (string) $registro['combustivel'],
     'litros'        => $registro['litros'] !== null ? (string) $registro['litros'] : '',
     'valor_pago'    => (string) $registro['valor_pago'],
     'descricao'     => (string) $registro['descricao'],
@@ -47,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['data']          = (string) ($_POST['data'] ?? '');
     $dados['km_atual']      = (string) ($_POST['km_atual'] ?? '');
     $dados['tipo_registro'] = (string) ($_POST['tipo_registro'] ?? '');
+    $dados['combustivel']   = (string) ($_POST['combustivel'] ?? '');
     $dados['litros']        = (string) ($_POST['litros'] ?? '');
     $dados['valor_pago']    = (string) ($_POST['valor_pago'] ?? '');
     $dados['descricao']     = trim((string) ($_POST['descricao'] ?? ''));
@@ -56,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipoRegistro  = in_array($dados['tipo_registro'], ['Abastecimento', 'Manutencao'], true) ? $dados['tipo_registro'] : null;
     $valorPago     = filter_var($dados['valor_pago'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0]]);
     $litros        = $dados['litros'] === '' ? null : filter_var($dados['litros'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
+    $combustivel   = in_array($dados['combustivel'], $combustiveisPermitidos, true) ? $dados['combustivel'] : null;
     $dataRegistro  = DateTime::createFromFormat('Y-m-d', $dados['data']);
 
     if (!$veiculoId) {
@@ -82,6 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($tipoRegistro === 'Abastecimento' && !$litros) {
         $erros[] = 'Informe os litros abastecidos.';
     }
+    if ($tipoRegistro === 'Abastecimento' && !$combustivel) {
+        $erros[] = 'Selecione o combustível.';
+    }
     if (mb_strlen($dados['descricao']) > 255) {
         $erros[] = 'Descrição muito longa (máx. 255 caracteres).';
     }
@@ -91,8 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'UPDATE registros r
              INNER JOIN veiculos v ON v.id = r.veiculo_id
              SET r.veiculo_id = :veiculo_id, r.data = :data, r.km_atual = :km_atual,
-                 r.tipo_registro = :tipo_registro, r.litros = :litros, r.valor_pago = :valor_pago,
-                 r.descricao = :descricao
+                 r.tipo_registro = :tipo_registro, r.combustivel = :combustivel, r.litros = :litros,
+                 r.valor_pago = :valor_pago, r.descricao = :descricao
              WHERE r.id = :id AND v.usuario_id = :usuario_id'
         );
         $upd->execute([
@@ -100,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':data'          => $dataRegistro->format('Y-m-d'),
             ':km_atual'      => $kmAtual,
             ':tipo_registro' => $tipoRegistro,
+            ':combustivel'   => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
             ':litros'        => $tipoRegistro === 'Abastecimento' ? $litros : null,
             ':valor_pago'    => $valorPago,
             ':descricao'     => $dados['descricao'] !== '' ? $dados['descricao'] : null,
@@ -162,7 +171,17 @@ require __DIR__ . '/includes/header.php';
         <input type="number" name="km_atual" class="form-control form-control-lg" min="0" inputmode="numeric" value="<?= h($dados['km_atual']) ?>" required>
     </div>
 
-    <div class="mb-3 <?= $dados['tipo_registro'] === 'Manutencao' ? 'd-none' : '' ?>" id="campoLitros">
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] === 'Manutencao' ? 'd-none' : '' ?>">
+        <label class="form-label">Combustível</label>
+        <select name="combustivel" class="form-select form-select-lg">
+            <option value="">Selecione...</option>
+            <?php foreach ($combustiveisPermitidos as $c): ?>
+            <option value="<?= h($c) ?>" <?= $dados['combustivel'] === $c ? 'selected' : '' ?>><?= h($c) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] === 'Manutencao' ? 'd-none' : '' ?>">
         <label class="form-label">Litros Abastecidos</label>
         <input type="number" step="0.01" min="0.01" name="litros" class="form-control form-control-lg" inputmode="decimal" value="<?= h($dados['litros']) ?>">
     </div>
