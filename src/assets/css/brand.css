@@ -10,6 +10,10 @@
     --ps-primary-light: #ffb35c;
     --ps-success: #2ecc71;
     --ps-danger: #e74c3c;
+    --ps-shadow-rgb: 19, 21, 26;
+    --ps-radius-lg: 1.25rem;
+    --ps-radius-md: 1rem;
+    --ps-ease: cubic-bezier(.22, .68, 0, 1);
 
     /* sobrepõe a paleta padrão do Bootstrap pela identidade da marca */
     --bs-primary: var(--ps-primary);
@@ -107,8 +111,9 @@ body {
 
 .card-resumo {
     margin: -1.5rem 1rem 1.5rem;
-    border-radius: 1rem;
+    border-radius: var(--ps-radius-lg);
     border: none;
+    box-shadow: 0 2px 8px rgba(var(--ps-shadow-rgb), .06), 0 12px 28px rgba(var(--ps-shadow-rgb), .08);
 }
 
 .fab {
@@ -122,16 +127,29 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 1.75rem;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 14px rgba(var(--ps-primary-rgb), .45);
     z-index: 1030;
     background-color: var(--ps-primary);
     border-color: var(--ps-primary);
+    transition: transform .15s var(--ps-ease), box-shadow .15s var(--ps-ease);
+}
+
+.fab:active {
+    transform: scale(.92);
 }
 
 .lista-registros .card,
 .lista-veiculos .card {
     border: none;
-    border-radius: 0.75rem;
+    border-radius: var(--ps-radius-md);
+    box-shadow: 0 1px 3px rgba(var(--ps-shadow-rgb), .05), 0 6px 16px rgba(var(--ps-shadow-rgb), .06);
+    transition: transform .15s var(--ps-ease), box-shadow .15s var(--ps-ease);
+}
+
+.lista-registros .card:active,
+.lista-veiculos .card:active {
+    transform: scale(.98);
+    box-shadow: 0 1px 2px rgba(var(--ps-shadow-rgb), .05);
 }
 
 /* Navegação inferior — uso diário em uma mão, padrão de app mobile */
@@ -163,10 +181,19 @@ body {
 
 .bottom-nav a i {
     font-size: 1.3rem;
+    transition: transform .2s var(--ps-ease);
 }
 
 .bottom-nav a.ativo {
     color: var(--ps-primary-dark);
+}
+
+.bottom-nav a.ativo i {
+    transform: translateY(-2px) scale(1.08);
+}
+
+.bottom-nav a:active i {
+    transform: scale(.85);
 }
 
 body { padding-bottom: 76px; }
@@ -191,4 +218,142 @@ body { padding-bottom: 76px; }
     height: 84px;
     margin: 0 auto 1rem;
     display: block;
+}
+
+/* Refinamento global — cantos mais suaves e sombras com leve tom da marca,
+   em vez do visual "quadrado" padrão do Bootstrap */
+:root {
+    --bs-border-radius: var(--ps-radius-md);
+    --bs-border-radius-lg: var(--ps-radius-lg);
+    --bs-border-radius-sm: .6rem;
+}
+
+.card {
+    box-shadow: 0 1px 3px rgba(var(--ps-shadow-rgb), .05), 0 8px 20px rgba(var(--ps-shadow-rgb), .06);
+}
+
+.btn {
+    border-radius: .85rem;
+    transition: transform .12s var(--ps-ease), box-shadow .15s var(--ps-ease), background-color .15s var(--ps-ease);
+}
+
+.btn:active {
+    transform: scale(.96);
+}
+
+.btn-primary {
+    box-shadow: 0 6px 16px rgba(var(--ps-primary-rgb), .3);
+}
+
+.form-control,
+.form-select {
+    border-radius: .85rem;
+    transition: border-color .15s var(--ps-ease), box-shadow .15s var(--ps-ease);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--ps-primary);
+    box-shadow: 0 0 0 .25rem rgba(var(--ps-primary-rgb), .2);
+}
+
+.badge {
+    border-radius: .6rem;
+}
+
+/* Entrada suave da página — respeita quem prefere menos movimento */
+@media (prefers-reduced-motion: no-preference) {
+    .header-dark,
+    .auth-card,
+    main.container {
+        animation: ps-entrada .45s var(--ps-ease) both;
+    }
+
+    main.container {
+        animation-delay: .05s;
+    }
+
+    .lista-registros .card,
+    .lista-veiculos .card {
+        animation: ps-entrada .35s var(--ps-ease) both;
+    }
+
+    .lista-registros .card:nth-child(1), .lista-veiculos .card:nth-child(1) { animation-delay: .02s; }
+    .lista-registros .card:nth-child(2), .lista-veiculos .card:nth-child(2) { animation-delay: .06s; }
+    .lista-registros .card:nth-child(3), .lista-veiculos .card:nth-child(3) { animation-delay: .10s; }
+    .lista-registros .card:nth-child(4), .lista-veiculos .card:nth-child(4) { animation-delay: .14s; }
+    .lista-registros .card:nth-child(5), .lista-veiculos .card:nth-child(5) { animation-delay: .18s; }
+    .lista-registros .card:nth-child(n+6), .lista-veiculos .card:nth-child(n+6) { animation-delay: .2s; }
+
+    .fab {
+        animation: ps-pulso 2.6s ease-in-out 1.2s infinite;
+    }
+}
+
+@keyframes ps-entrada {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ps-pulso {
+    0%, 100% { box-shadow: 0 4px 14px rgba(var(--ps-primary-rgb), .45); }
+    50%      { box-shadow: 0 4px 22px rgba(var(--ps-primary-rgb), .7); }
+}
+
+/* Medidor (gauge) animado da última média — momento de assinatura da marca */
+.medidor {
+    position: relative;
+    width: 200px;
+    max-width: 70%;
+    margin: 0 auto;
+}
+
+.medidor-svg {
+    width: 100%;
+    display: block;
+}
+
+.medidor-arco-fundo,
+.medidor-arco-valor {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+}
+
+.medidor-arco-fundo {
+    stroke: rgba(var(--ps-shadow-rgb), .08);
+}
+
+.medidor-arco-valor {
+    stroke: var(--ps-success);
+    stroke-dasharray: 251;
+    stroke-dashoffset: 251;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .medidor-arco-valor {
+        transition: stroke-dashoffset 1.1s var(--ps-ease);
+    }
+}
+
+.medidor-leitura {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 6px;
+    text-align: center;
+}
+
+.medidor-valor {
+    font-size: 2rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ps-success);
+}
+
+.medidor-unidade {
+    font-size: .8rem;
+    color: #8a8f98;
+    margin-left: .15rem;
 }
