@@ -37,7 +37,7 @@
 <?php $flash = flashPegar(); ?>
 <?php if ($flash): ?>
 <div class="container mt-3">
-    <div class="alert alert-<?= $flash['tipo'] === 'erro' ? 'danger' : 'success' ?> py-2 mb-0" role="alert">
+    <div class="alert alert-<?= $flash['tipo'] === 'erro' ? 'danger' : 'success' ?> py-2 mb-3" role="alert">
         <?= h($flash['mensagem']) ?>
     </div>
 </div>
