@@ -11,19 +11,28 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 ## Funcionalidades
 
 - Multi-usuário: cada conta só enxerga e mexe nos próprios veículos/registros
-- Cadastro de conta (e-mail + senha) e login com bloqueio temporário após tentativas falhas
+- Registro só por convite: primeira conta criada via cadastro aberto; depois disso, só entra quem
+  recebe um convite por e-mail (link com token de uso único e validade de 7 dias) de alguém que já
+  usa o app
+- Login com bloqueio temporário após tentativas falhas
 - Cadastro, edição e exclusão de veículos (nome + tipo: Moto/Carro/Outro)
-- Registro, edição e exclusão de abastecimentos (km, litros, valor pago) e manutenções (km, valor, descrição)
-- Cálculo automático da última média de consumo (km/l) a partir dos dois últimos abastecimentos
-- Filtro de registros por veículo e total gasto no mês
+- Registro, edição e exclusão de abastecimentos (km, litros, valor pago, combustível: Gasolina
+  Comum/Aditivada, Etanol, Diesel, GNV ou Outro) e manutenções (km, valor, descrição)
+- Cálculo automático da última média de consumo (km/l), do preço por litro e do gasto do mês
+- Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês e evolução do consumo,
+  além de cards de gasto total, gasto médio por dia e preço médio por litro
+- Filtro de registros e relatórios por veículo
+- Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
+  cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
 - Identidade visual própria (paleta, logo, favicons) e manifest PWA (instalável na tela inicial)
 - Interface mobile-first (Bootstrap 5 + Bootstrap Icons), navegação inferior fixa e botão flutuante (FAB) para novo registro
 
 ## Stack
 
-- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + identidade visual própria (CSS) + manifest PWA
+- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + Chart.js (CDN) + identidade visual própria (CSS) + manifest PWA
 - **Backend:** PHP 8.2 puro (sem framework), Apache
 - **Banco:** MySQL 8.0, acesso exclusivo via PDO (prepared statements)
+- **E-mail:** cliente SMTP próprio em PHP puro (sem dependências), usado pro envio de convites
 - **Infra:** Docker Compose (build próprio da imagem PHP+Apache hardenizada)
 
 ## Estrutura de pastas
@@ -47,14 +56,18 @@ pitstop-br/
     │   ├── bootstrap.php   # sessão segura + carrega conexão/CSRF/auth/funções
     │   ├── conexao.php     # PDO (lê credenciais do ambiente)
     │   ├── csrf.php        # geração/validação de token CSRF
-    │   └── auth.php        # login/registro/logout/guard, hash de senha, lockout de tentativas
+    │   ├── auth.php        # login/registro/logout/guard, hash de senha, lockout de tentativas
+    │   └── mailer.php      # cliente SMTP mínimo (sem dependências) pro envio de convites
     ├── includes/
     │   ├── functions.php   # helpers (escape, flash, cálculo de consumo)
     │   ├── header.php
     │   └── footer.php
     ├── manifest.json       # manifest PWA (instalável na tela inicial)
     ├── login.php / cadastro.php / logout.php   # autenticação
+    ├── convidar.php / convite.php              # envio e aceite de convite (registro por convite)
+    ├── conta.php / privacidade.php             # minha conta (exclusão de dados) e política LGPD
     ├── index.php           # dashboard (última média, gastos do mês, registros)
+    ├── relatorios.php      # gráficos de gasto, km rodado e consumo
     ├── adicionar.php / registro_editar.php / excluir.php   # CRUD de registros
     └── veiculos.php / veiculo_editar.php / veiculo_excluir.php   # CRUD de veículos
 ```
@@ -70,6 +83,10 @@ pitstop-br/
   após login/cadastro
 - Isolamento multi-usuário: toda consulta/gravação de veículo e registro é restrita por
   `usuario_id` (via FK + `JOIN`/`WHERE`), prevenindo IDOR entre contas
+- Convites: token de 32 bytes aleatórios, armazenado só como hash SHA-256 no banco (nunca em
+  texto plano), expira em 7 dias, uso único garantido por lock transacional (`SELECT ... FOR
+  UPDATE`)
+- Exclusão de conta exige reautenticação por senha antes de apagar os dados definitivamente
 - Sessão: cookie `HttpOnly`, `SameSite=Strict`, `Secure` (atrás de proxy HTTPS)
 - Apache: `ServerTokens Prod`, sem listagem de diretório, headers `CSP`/`X-Frame-Options`/
   `X-Content-Type-Options`/`Referrer-Policy`, bloqueio de arquivos sensíveis (`.env`, `.sql`, etc.)
@@ -79,6 +96,23 @@ pitstop-br/
 - MySQL **sem porta exposta ao host** — acessível apenas pela rede Docker interna
 - Senhas geradas aleatoriamente (`openssl rand`), armazenadas só em `.env` (gitignored, `chmod 600`)
 - Limites de CPU/memória por container (`deploy.resources.limits`)
+
+## Configuração de e-mail (convites)
+
+Pra enviar convites por e-mail, defina no `.env` (raiz do projeto, gitignored):
+
+```
+SMTP_HOST=smtp.exemplo.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=noreply@pitstop.morenadoaco.com.br
+SMTP_PASS=...
+SMTP_FROM=PitStop BR <noreply@pitstop.morenadoaco.com.br>
+```
+
+Sem essas variáveis, o convite continua sendo gerado no banco normalmente, mas o e-mail não é
+enviado (fica registrado em log). O cliente SMTP é caseiro (sem dependências externas), suporta
+TLS implícito (porta 465) ou STARTTLS (porta 587) com `AUTH LOGIN`.
 
 ## Como rodar
 
@@ -93,5 +127,6 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.2.0  | 2026-06-30 | Registro por convite (token único por e-mail, SMTP próprio sem dependências), conformidade LGPD (política de privacidade, consentimento, exclusão de conta), combustível no abastecimento (Gasolina Comum/Aditivada, Etanol, Diesel, GNV, Outro), preço por litro calculado, página de Relatórios com gráficos (gasto por mês, km rodado, evolução do consumo) e reorganização da navegação (dropdown de conta + bottom-nav com Relatórios) |
 | 1.1.0  | 2026-06-30 | Multi-usuário: cadastro/login/logout com lockout de tentativas, isolamento de dados por conta (correção de IDOR em exclusão/edição), edição de veículo e registro, identidade visual própria (logo, paleta, favicons) e manifest PWA |
 | 1.0.0  | 2026-06-30 | Versão inicial: CRUD de veículos/registros, cálculo de km/l, hardening completo, deploy em produção com Nginx + Let's Encrypt em pitstop.morenadoaco.com.br |
