@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.morenadoaco.pitstop",
+      "sha256_cert_fingerprints": [
+        "D2:57:C8:5B:61:E9:3A:3E:C2:40:1A:D2:11:52:BD:F2:70:58:1E:F7:16:2B:FC:FF:40:DF:EB:DD:19:25:AB:47"
+      ]
+    }
+  }
+]
