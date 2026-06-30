@@ -22,6 +22,22 @@ CREATE TABLE IF NOT EXISTS veiculos (
     INDEX idx_veiculos_usuario (usuario_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS convites (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(190) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    criado_por INT UNSIGNED NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expira_em DATETIME NOT NULL,
+    usado_em DATETIME NULL,
+    CONSTRAINT fk_convites_criado_por
+        FOREIGN KEY (criado_por) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_convites_token_hash (token_hash),
+    INDEX idx_convites_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS registros (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     veiculo_id INT UNSIGNED NOT NULL,
