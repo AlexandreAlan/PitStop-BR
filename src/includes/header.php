@@ -3,64 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#ff6b35">
 <title><?= h($tituloPagina ?? 'PitStop BR') ?></title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<style>
-    body {
-        background-color: #f4f6f9;
-        padding-bottom: 110px;
-    }
-    .header-dark {
-        background-color: #1c1f26;
-        color: #fff;
-        padding: 1.25rem 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: .75rem;
-        position: relative;
-    }
-    .header-dark .voltar {
-        position: absolute;
-        left: 1rem;
-        color: #fff;
-        font-size: 1.25rem;
-    }
-    .card-resumo {
-        margin: -1.5rem 1rem 1.5rem;
-        border-radius: 1rem;
-        border: none;
-    }
-    .fab {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.75rem;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-        z-index: 1030;
-    }
-    .lista-registros .card,
-    .lista-veiculos .card {
-        border: none;
-        border-radius: 0.75rem;
-    }
-</style>
+<link rel="stylesheet" href="assets/css/brand.css">
 </head>
 <body>
 
+<?php $usuarioLogado = usuarioAtual(); ?>
+<?php if (!empty($telaAuth)): ?>
+<div class="auth-wrap">
+    <div class="auth-card">
+        <img src="assets/img/logo-mark.svg" class="auth-logo" alt="PitStop BR">
+        <h1 class="h4 text-center text-white mb-4"><?= h($tituloPagina ?? 'PitStop BR') ?></h1>
+<?php else: ?>
 <header class="header-dark">
     <?php if (!empty($mostrarVoltar)): ?>
     <a href="index.php" class="voltar"><i class="bi bi-arrow-left"></i></a>
     <?php endif; ?>
-    <h1 class="h4 mb-0 text-center"><i class="bi bi-fuel-pump-fill me-2"></i>PitStop BR</h1>
+    <img src="assets/img/logo-mark.svg" class="brand-logo" alt="">
+    <h1 class="h4 mb-0 text-center brand-wordmark">Pit<span class="brand-wordmark-accent">Stop</span> BR</h1>
+    <?php if ($usuarioLogado !== null): ?>
+    <a href="logout.php" class="sair" title="Sair"><i class="bi bi-box-arrow-right"></i></a>
+    <?php endif; ?>
 </header>
+<?php endif; ?>
 
 <?php $flash = flashPegar(); ?>
 <?php if ($flash): ?>
@@ -71,4 +43,6 @@
 </div>
 <?php endif; ?>
 
+<?php if (empty($telaAuth)): ?>
 <main class="container">
+<?php endif; ?>
