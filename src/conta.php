@@ -53,8 +53,7 @@ require __DIR__ . '/includes/header.php';
         <p class="mb-1"><strong>E-mail:</strong> <?= h($dadosUsuario['email']) ?></p>
         <p class="mb-1"><strong>Conta criada em:</strong> <?= h((new DateTime($dadosUsuario['criado_em']))->format('d/m/Y')) ?></p>
         <p class="mb-0 small text-muted">
-            <a href="privacidade.php">Ver Política de Privacidade</a> ·
-            <a href="convidar.php">Convidar pessoas</a>
+            <a href="privacidade.php">Ver Política de Privacidade</a>
         </p>
     </div>
 </div>
