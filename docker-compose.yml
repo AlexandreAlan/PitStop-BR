@@ -1,0 +1,75 @@
+services:
+  web:
+    build:
+      context: ./docker/php
+    container_name: pitstop_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8033:80"
+    volumes:
+      - ./src:/var/www/html:ro
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASS: ${MYSQL_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - pitstop_net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+      - CHOWN
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/apache2
+      - /var/lock/apache2
+      - /var/log/apache2
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  db:
+    image: mysql:8.0
+    container_name: pitstop_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - pitstop_db_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sem ports mapeado para o host: MySQL acessível apenas dentro da rede interna do Docker.
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - pitstop_net
+
+volumes:
+  pitstop_db_data:
+
+networks:
+  pitstop_net:
+    driver: bridge
