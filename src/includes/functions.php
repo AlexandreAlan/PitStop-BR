@@ -28,15 +28,19 @@ function formatarMoeda(float $valor): string
 
 /**
  * KM/L calculado a partir dos dois últimos abastecimentos (por KM), não por data.
+ * Sempre restrito aos veículos do usuário informado.
  */
-function calcularUltimaMedia(PDO $pdo, ?int $veiculoId = null): ?float
+function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): ?float
 {
-    $sql = "SELECT km_atual, litros FROM registros
-            WHERE tipo_registro = 'Abastecimento' AND litros IS NOT NULL"
-        . ($veiculoId !== null ? ' AND veiculo_id = :veiculo_id' : '')
-        . ' ORDER BY km_atual DESC LIMIT 2';
+    $sql = "SELECT r.km_atual, r.litros FROM registros r
+            INNER JOIN veiculos v ON v.id = r.veiculo_id
+            WHERE v.usuario_id = :usuario_id
+              AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL"
+        . ($veiculoId !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
+        . ' ORDER BY r.km_atual DESC LIMIT 2';
 
     $stmt = $pdo->prepare($sql);
+    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
     if ($veiculoId !== null) {
         $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
     }
