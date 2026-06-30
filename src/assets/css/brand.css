@@ -1,0 +1,186 @@
+/* PitStop BR — identidade visual */
+:root {
+    --ps-bg: #f4f6f9;
+    --ps-ink: #13151a;
+    --ps-dark: #1c1f26;
+    --ps-dark-2: #23272f;
+    --ps-primary: #ff6b35;
+    --ps-primary-rgb: 255, 107, 53;
+    --ps-primary-dark: #e8551f;
+    --ps-primary-light: #ffb35c;
+    --ps-success: #2ecc71;
+    --ps-danger: #e74c3c;
+
+    /* sobrepõe a paleta padrão do Bootstrap pela identidade da marca */
+    --bs-primary: var(--ps-primary);
+    --bs-primary-rgb: var(--ps-primary-rgb);
+    --bs-link-color: var(--ps-primary-dark);
+    --bs-link-color-rgb: 232, 85, 31;
+    --bs-link-hover-color: var(--ps-primary);
+    --bs-success: var(--ps-success);
+    --bs-success-rgb: 46, 204, 113;
+    --bs-danger: var(--ps-danger);
+    --bs-danger-rgb: 231, 76, 60;
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--ps-primary);
+    --bs-btn-border-color: var(--ps-primary);
+    --bs-btn-hover-bg: var(--ps-primary-dark);
+    --bs-btn-hover-border-color: var(--ps-primary-dark);
+    --bs-btn-active-bg: var(--ps-primary-dark);
+    --bs-btn-active-border-color: var(--ps-primary-dark);
+    --bs-btn-disabled-bg: var(--ps-primary);
+    --bs-btn-disabled-border-color: var(--ps-primary);
+    --bs-btn-focus-shadow-rgb: var(--ps-primary-rgb);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--ps-primary-dark);
+    --bs-btn-border-color: var(--ps-primary);
+    --bs-btn-hover-bg: var(--ps-primary);
+    --bs-btn-hover-border-color: var(--ps-primary);
+    --bs-btn-active-bg: var(--ps-primary);
+    --bs-btn-active-border-color: var(--ps-primary);
+}
+
+.btn-check:checked + .btn-outline-primary {
+    background-color: var(--ps-primary);
+    border-color: var(--ps-primary);
+    color: #fff;
+}
+
+.text-success { color: var(--ps-success) !important; }
+.bg-success   { background-color: var(--ps-success) !important; }
+
+body {
+    background-color: var(--ps-bg);
+}
+
+.brand-logo {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+}
+
+.brand-wordmark {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.brand-wordmark .brand-wordmark-accent {
+    color: var(--ps-primary);
+}
+
+.header-dark {
+    background: linear-gradient(180deg, var(--ps-dark-2) 0%, var(--ps-dark) 100%);
+    color: #fff;
+    padding: 1.25rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    position: relative;
+}
+
+.header-dark .voltar {
+    position: absolute;
+    left: 1rem;
+    color: #fff;
+    font-size: 1.25rem;
+}
+
+.header-dark .sair {
+    position: absolute;
+    right: 1rem;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 1.15rem;
+}
+
+.card-resumo {
+    margin: -1.5rem 1rem 1.5rem;
+    border-radius: 1rem;
+    border: none;
+}
+
+.fab {
+    position: fixed;
+    bottom: 88px;
+    right: 24px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    z-index: 1030;
+    background-color: var(--ps-primary);
+    border-color: var(--ps-primary);
+}
+
+.lista-registros .card,
+.lista-veiculos .card {
+    border: none;
+    border-radius: 0.75rem;
+}
+
+/* Navegação inferior — uso diário em uma mão, padrão de app mobile */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background-color: #fff;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+    z-index: 1020;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-nav a {
+    flex: 1;
+    text-align: center;
+    padding: 0.55rem 0 0.5rem;
+    color: #8a8f98;
+    text-decoration: none;
+    font-size: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.bottom-nav a i {
+    font-size: 1.3rem;
+}
+
+.bottom-nav a.ativo {
+    color: var(--ps-primary-dark);
+}
+
+body { padding-bottom: 76px; }
+
+/* Telas de autenticação */
+.auth-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% -10%, var(--ps-dark-2) 0%, var(--ps-ink) 60%);
+    padding: 1.5rem;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+}
+
+.auth-logo {
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 1rem;
+    display: block;
+}
