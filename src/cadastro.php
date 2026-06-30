@@ -7,6 +7,23 @@ if (usuarioAtual() !== null) {
     exit;
 }
 
+$existeAlgumUsuario = (int) $pdo->query('SELECT COUNT(*) FROM usuarios')->fetchColumn() > 0;
+if ($existeAlgumUsuario) {
+    $tituloPagina = 'Criar Conta';
+    $telaAuth = true;
+    require __DIR__ . '/includes/header.php';
+    ?>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4 text-center">
+            <p class="mb-3">O cadastro aberto está encerrado. Para criar uma conta, peça um convite a alguém que já usa o PitStop BR.</p>
+            <a href="login.php" class="btn btn-outline-primary">Voltar pro login</a>
+        </div>
+    </div>
+    <?php
+    require __DIR__ . '/includes/footer.php';
+    exit;
+}
+
 $erros = [];
 $nome = '';
 $email = '';
