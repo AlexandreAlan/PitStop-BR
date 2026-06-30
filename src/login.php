@@ -68,4 +68,8 @@ require __DIR__ . '/includes/header.php';
     </div>
 </form>
 
+<p class="text-center mt-3 mb-0">
+    <a href="instalar.php" class="small text-white-50"><i class="bi bi-phone me-1"></i>Instalar o app no celular</a>
+</p>
+
 <?php require __DIR__ . '/includes/footer.php'; ?>
