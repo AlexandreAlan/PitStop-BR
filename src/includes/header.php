@@ -29,7 +29,17 @@
     <img src="assets/img/logo-mark.svg" class="brand-logo" alt="">
     <h1 class="h4 mb-0 text-center brand-wordmark">Pit<span class="brand-wordmark-accent">Stop</span> BR</h1>
     <?php if ($usuarioLogado !== null): ?>
-    <a href="logout.php" class="sair" title="Sair"><i class="bi bi-box-arrow-right"></i></a>
+    <div class="dropdown sair">
+        <a href="#" class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Conta">
+            <i class="bi bi-person-circle"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="conta.php"><i class="bi bi-person me-2"></i>Minha Conta</a></li>
+            <li><a class="dropdown-item" href="convidar.php"><i class="bi bi-send me-2"></i>Convidar Pessoas</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
+        </ul>
+    </div>
     <?php endif; ?>
 </header>
 <?php endif; ?>
