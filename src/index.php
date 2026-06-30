@@ -2,29 +2,39 @@
 declare(strict_types=1);
 require_once __DIR__ . '/config/bootstrap.php';
 
-$veiculos = $pdo->query('SELECT id, nome, tipo FROM veiculos ORDER BY nome')->fetchAll();
+$usuario = exigirLogin();
+
+$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
+$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
+$veiculos = $veiculosStmt->fetchAll();
 
 $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?: null;
 
-$ultimaMedia = calcularUltimaMedia($pdo, $veiculoIdFiltro);
+$ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 
 $sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.litros, r.valor_pago, r.descricao, v.nome AS veiculo_nome
                   FROM registros r
-                  INNER JOIN veiculos v ON v.id = r.veiculo_id'
-    . ($veiculoIdFiltro !== null ? ' WHERE r.veiculo_id = :veiculo_id' : '')
+                  INNER JOIN veiculos v ON v.id = r.veiculo_id
+                  WHERE v.usuario_id = :usuario_id'
+    . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
     . ' ORDER BY r.data DESC, r.id DESC LIMIT 10';
 
 $stmt = $pdo->prepare($sqlRegistros);
+$stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
 if ($veiculoIdFiltro !== null) {
     $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
 }
 $stmt->execute();
 $registros = $stmt->fetchAll();
 
-$sqlGastoMes = 'SELECT COALESCE(SUM(valor_pago), 0) FROM registros
-                 WHERE DATE_FORMAT(data, "%Y-%m") = DATE_FORMAT(CURDATE(), "%Y-%m")'
-    . ($veiculoIdFiltro !== null ? ' AND veiculo_id = :veiculo_id' : '');
+$sqlGastoMes = 'SELECT COALESCE(SUM(r.valor_pago), 0)
+                 FROM registros r
+                 INNER JOIN veiculos v ON v.id = r.veiculo_id
+                 WHERE v.usuario_id = :usuario_id
+                   AND DATE_FORMAT(r.data, "%Y-%m") = DATE_FORMAT(CURDATE(), "%Y-%m")'
+    . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '');
 $stmt = $pdo->prepare($sqlGastoMes);
+$stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
 if ($veiculoIdFiltro !== null) {
     $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
 }
@@ -61,7 +71,6 @@ require __DIR__ . '/includes/header.php';
 <div class="lista-registros px-1">
     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
         <h6 class="text-muted mb-0">Registros Recentes</h6>
-        <a href="veiculos.php" class="small text-decoration-none"><i class="bi bi-car-front me-1"></i>Veículos</a>
     </div>
 
     <?php if (!$registros): ?>
@@ -83,8 +92,11 @@ require __DIR__ . '/includes/header.php';
                         <?php if ($r['descricao']): ?><div class="text-muted small fst-italic"><?= h($r['descricao']) ?></div><?php endif; ?>
                     </div>
                     <div class="text-end">
-                        <div class="fw-bold"><?= h(formatarMoeda((float) $r['valor_pago'])) ?></div>
-                        <form method="post" action="excluir.php" class="form-excluir mt-1">
+                        <div class="fw-bold mb-1"><?= h(formatarMoeda((float) $r['valor_pago'])) ?></div>
+                        <a href="registro_editar.php?id=<?= (int) $r['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="post" action="excluir.php" class="form-excluir d-inline">
                             <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
                             <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
                             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1">
