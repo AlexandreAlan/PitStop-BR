@@ -42,12 +42,15 @@ $nome = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrfVerificarOuFalhar();
 
-    $nome           = trim((string) ($_POST['nome'] ?? ''));
-    $senha          = (string) ($_POST['senha'] ?? '');
-    $confirmarSenha = (string) ($_POST['confirmar_senha'] ?? '');
+    $nome               = trim((string) ($_POST['nome'] ?? ''));
+    $senha              = (string) ($_POST['senha'] ?? '');
+    $confirmarSenha     = (string) ($_POST['confirmar_senha'] ?? '');
+    $aceitouPrivacidade = !empty($_POST['aceite_privacidade']);
 
     if ($senha !== $confirmarSenha) {
         $erros[] = 'As senhas não conferem.';
+    } elseif (!$aceitouPrivacidade) {
+        $erros[] = 'É necessário aceitar a Política de Privacidade pra criar a conta.';
     }
 
     if (!$erros) {
@@ -63,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->rollBack();
                 $erros[] = 'Este convite já foi usado ou expirou.';
             } else {
-                $resultado = registrarUsuario($pdo, $nome, $conviteTravado['email'], $senha);
+                $resultado = registrarUsuario($pdo, $nome, $conviteTravado['email'], $senha, true);
                 if (!$resultado['ok']) {
                     $pdo->rollBack();
                     $erros[] = $resultado['erro'];
@@ -124,9 +127,16 @@ require __DIR__ . '/includes/header.php';
             <div class="form-text">Mínimo de 8 caracteres.</div>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-3">
             <label class="form-label">Confirmar senha</label>
             <input type="password" name="confirmar_senha" minlength="8" class="form-control form-control-lg" required>
+        </div>
+
+        <div class="mb-4 form-check">
+            <input type="checkbox" name="aceite_privacidade" id="aceitePrivacidade" class="form-check-input" required>
+            <label class="form-check-label small" for="aceitePrivacidade">
+                Li e aceito a <a href="privacidade.php" target="_blank" rel="noopener">Política de Privacidade</a>.
+            </label>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg w-100">
