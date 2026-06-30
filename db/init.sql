@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS registros (
     data DATE NOT NULL,
     km_atual INT UNSIGNED NOT NULL,
     tipo_registro ENUM('Abastecimento', 'Manutencao') NOT NULL,
+    combustivel ENUM('Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro') NULL,
     litros DECIMAL(6,2) NULL,
     valor_pago DECIMAL(10,2) NOT NULL,
     descricao VARCHAR(255) NULL,
@@ -57,6 +58,8 @@ CREATE TABLE IF NOT EXISTS registros (
     INDEX idx_registros_tipo (tipo_registro),
     CONSTRAINT chk_litros_abastecimento
         CHECK (tipo_registro <> 'Abastecimento' OR litros IS NOT NULL),
+    CONSTRAINT chk_combustivel_abastecimento
+        CHECK (tipo_registro <> 'Abastecimento' OR combustivel IS NOT NULL),
     CONSTRAINT chk_valores_positivos
         CHECK (valor_pago >= 0 AND (litros IS NULL OR litros > 0) AND km_atual >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
