@@ -48,9 +48,22 @@ require __DIR__ . '/includes/header.php';
 <div class="card card-resumo shadow-sm">
     <div class="card-body text-center py-4">
         <p class="text-muted mb-1 small text-uppercase">Última Média</p>
-        <h2 class="display-6 fw-bold text-success mb-0">
-            <i class="bi bi-speedometer2 me-1"></i><?= $ultimaMedia !== null ? h(number_format($ultimaMedia, 1, ',', '.') . ' km/l') : 'Sem dados' ?>
-        </h2>
+        <?php if ($ultimaMedia !== null):
+            $kmlReferencia = 20.0; // faixa visual de referência (a maioria dos veículos fica entre 5 e 20 km/l)
+            $percentual = max(0.0, min(1.0, $ultimaMedia / $kmlReferencia));
+        ?>
+        <div class="medidor" data-valor="<?= h(number_format($ultimaMedia, 1, '.', '')) ?>" data-percentual="<?= h((string) round($percentual, 4)) ?>">
+            <svg viewBox="0 0 200 130" class="medidor-svg" aria-hidden="true">
+                <path d="M 20 110 A 80 80 0 0 1 180 110" class="medidor-arco-fundo" />
+                <path d="M 20 110 A 80 80 0 0 1 180 110" class="medidor-arco-valor" />
+            </svg>
+            <div class="medidor-leitura">
+                <span class="medidor-valor">0,0</span><span class="medidor-unidade">km/l</span>
+            </div>
+        </div>
+        <?php else: ?>
+        <h2 class="display-6 fw-bold text-success mb-0"><i class="bi bi-speedometer2 me-1"></i>Sem dados</h2>
+        <?php endif; ?>
         <p class="text-muted small mt-2 mb-0">Gasto este mês: <strong><?= h(formatarMoeda($gastoMes)) ?></strong></p>
     </div>
 </div>
@@ -122,4 +135,5 @@ require __DIR__ . '/includes/header.php';
 </a>
 
 <script src="assets/js/index.js"></script>
+<script src="assets/js/animacoes.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
