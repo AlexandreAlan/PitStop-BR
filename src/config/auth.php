@@ -28,7 +28,7 @@ function exigirLogin(): array
     return $usuario;
 }
 
-function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha): array
+function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, bool $aceitouPrivacidade): array
 {
     $nome  = trim($nome);
     $email = mb_strtolower(trim($email));
@@ -42,6 +42,9 @@ function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha):
     if (mb_strlen($senha) < AUTH_SENHA_MIN) {
         return ['ok' => false, 'erro' => 'A senha precisa ter pelo menos ' . AUTH_SENHA_MIN . ' caracteres.'];
     }
+    if (!$aceitouPrivacidade) {
+        return ['ok' => false, 'erro' => 'É necessário aceitar a Política de Privacidade pra criar a conta.'];
+    }
 
     $existe = $pdo->prepare('SELECT 1 FROM usuarios WHERE email = :email');
     $existe->execute([':email' => $email]);
@@ -50,7 +53,9 @@ function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha):
     }
 
     $hash = password_hash($senha, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare('INSERT INTO usuarios (nome, email, senha_hash) VALUES (:nome, :email, :senha_hash)');
+    $stmt = $pdo->prepare(
+        'INSERT INTO usuarios (nome, email, senha_hash, aceite_privacidade_em) VALUES (:nome, :email, :senha_hash, NOW())'
+    );
     $stmt->execute([':nome' => $nome, ':email' => $email, ':senha_hash' => $hash]);
 
     return ['ok' => true, 'id' => (int) $pdo->lastInsertId(), 'nome' => $nome];
