@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $erros[] = $resultado['erro'];
 }
 
+$existeAlgumUsuario = (int) $pdo->query('SELECT COUNT(*) FROM usuarios')->fetchColumn() > 0;
+
 $tituloPagina = 'Entrar';
 $telaAuth = true;
 require __DIR__ . '/includes/header.php';
@@ -57,7 +59,11 @@ require __DIR__ . '/includes/header.php';
         </button>
 
         <p class="text-center text-muted small mb-0">
-            Não tem conta? <a href="cadastro.php">Cadastre-se</a>
+            <?php if ($existeAlgumUsuario): ?>
+                Não tem conta? Peça um convite a alguém que já usa o PitStop BR.
+            <?php else: ?>
+                Não tem conta? <a href="cadastro.php">Cadastre-se</a>
+            <?php endif; ?>
         </p>
     </div>
 </form>
