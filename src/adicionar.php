@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/config/bootstrap.php';
 
+$usuario = exigirLogin();
+
 $erros = [];
 $dados = [
     'veiculo_id'    => '',
@@ -34,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$veiculoId) {
         $erros[] = 'Selecione um veículo válido.';
     } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id');
-        $existe->execute([':id' => $veiculoId]);
+        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuario['id']]);
         if (!$existe->fetchColumn()) {
             $erros[] = 'Veículo não encontrado.';
         }
@@ -80,7 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$veiculos = $pdo->query('SELECT id, nome, tipo FROM veiculos ORDER BY nome')->fetchAll();
+$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
+$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
+$veiculos = $veiculosStmt->fetchAll();
 $tituloPagina = 'Adicionar Registro — PitStop BR';
 $mostrarVoltar = true;
 require __DIR__ . '/includes/header.php';
