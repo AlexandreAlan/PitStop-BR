@@ -9,14 +9,69 @@ $veiculosStmt->execute([':usuario_id' => $usuario['id']]);
 $veiculos = $veiculosStmt->fetchAll();
 
 $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?: null;
-$filtroVeiculoSql = $veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '';
 
-$bind = function (PDOStatement $stmt) use ($usuario, $veiculoIdFiltro): void {
+$dataInicioFiltro = null;
+$dataInicioBruta = (string) ($_GET['data_inicio'] ?? '');
+if ($dataInicioBruta !== '') {
+    $d = DateTime::createFromFormat('Y-m-d', $dataInicioBruta);
+    $dataInicioFiltro = ($d && $d->format('Y-m-d') === $dataInicioBruta) ? $dataInicioBruta : null;
+}
+
+$dataFimFiltro = null;
+$dataFimBruta = (string) ($_GET['data_fim'] ?? '');
+if ($dataFimBruta !== '') {
+    $d = DateTime::createFromFormat('Y-m-d', $dataFimBruta);
+    $dataFimFiltro = ($d && $d->format('Y-m-d') === $dataFimBruta) ? $dataFimBruta : null;
+}
+
+$filtroVeiculoSql = ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
+    . ($dataInicioFiltro !== null ? ' AND r.data >= :data_inicio' : '')
+    . ($dataFimFiltro !== null ? ' AND r.data <= :data_fim' : '');
+
+$bind = function (PDOStatement $stmt) use ($usuario, $veiculoIdFiltro, $dataInicioFiltro, $dataFimFiltro): void {
     $stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
     if ($veiculoIdFiltro !== null) {
         $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
     }
+    if ($dataInicioFiltro !== null) {
+        $stmt->bindValue(':data_inicio', $dataInicioFiltro);
+    }
+    if ($dataFimFiltro !== null) {
+        $stmt->bindValue(':data_fim', $dataFimFiltro);
+    }
 };
+
+if (($_GET['formato'] ?? '') === 'csv') {
+    $stmt = $pdo->prepare(
+        'SELECT r.data, v.nome AS veiculo, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao
+         FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
+         ORDER BY r.data'
+    );
+    $bind($stmt);
+    $stmt->execute();
+    $linhasExportacao = $stmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="pitstop-relatorio-' . date('Y-m-d') . '.csv"');
+    $saida = fopen('php://output', 'w');
+    fwrite($saida, "\xEF\xBB\xBF"); // BOM pra abrir certinho com acentos no Excel
+    fputcsv($saida, ['Data', 'Veiculo', 'Tipo', 'Combustivel/Categoria', 'Litros', 'Valor (R$)', 'Descricao'], ';');
+    foreach ($linhasExportacao as $l) {
+        fputcsv($saida, [
+            (new DateTime($l['data']))->format('d/m/Y'),
+            $l['veiculo'],
+            $l['tipo_registro'],
+            $l['combustivel'] ?? $l['categoria_despesa'] ?? '',
+            $l['litros'] !== null ? number_format((float) $l['litros'], 2, ',', '.') : '',
+            number_format((float) $l['valor_pago'], 2, ',', '.'),
+            (string) $l['descricao'],
+        ], ';');
+    }
+    fclose($saida);
+    exit;
+}
 
 // Resumo: total gasto, gasto médio por dia, preço médio por litro
 $stmt = $pdo->prepare(
@@ -115,18 +170,41 @@ $mostrarVoltar = true;
 require __DIR__ . '/includes/header.php';
 ?>
 
-<?php if (count($veiculos) > 1): ?>
 <form method="get" class="px-1 mb-3" id="formFiltroVeiculo">
-    <select name="veiculo_id" class="form-select" id="selectVeiculoFiltro">
-        <option value="">Todos os veículos</option>
-        <?php foreach ($veiculos as $v): ?>
-        <option value="<?= (int) $v['id'] ?>" <?= $veiculoIdFiltro === (int) $v['id'] ? 'selected' : '' ?>>
-            <?= h($v['nome']) ?> (<?= h($v['tipo']) ?>)
-        </option>
-        <?php endforeach; ?>
-    </select>
+    <?php if (count($veiculos) > 1): ?>
+    <div class="mb-2">
+        <select name="veiculo_id" class="form-select" id="selectVeiculoFiltro">
+            <option value="">Todos os veículos</option>
+            <?php foreach ($veiculos as $v): ?>
+            <option value="<?= (int) $v['id'] ?>" <?= $veiculoIdFiltro === (int) $v['id'] ? 'selected' : '' ?>>
+                <?= h($v['nome']) ?> (<?= h($v['tipo']) ?>)
+            </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <?php endif; ?>
+    <div class="row gx-2">
+        <div class="col-6">
+            <label class="form-label small text-muted mb-1">De</label>
+            <input type="date" name="data_inicio" class="form-control" value="<?= h((string) $dataInicioFiltro) ?>">
+        </div>
+        <div class="col-6">
+            <label class="form-label small text-muted mb-1">Até</label>
+            <input type="date" name="data_fim" class="form-control" value="<?= h((string) $dataFimFiltro) ?>">
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+        <a class="btn btn-outline-secondary flex-fill" href="relatorios.php?formato=csv&<?= h(http_build_query(['veiculo_id' => $veiculoIdFiltro, 'data_inicio' => $dataInicioFiltro, 'data_fim' => $dataFimFiltro])) ?>">
+            <i class="bi bi-download me-1"></i>CSV
+        </a>
+        <button type="button" class="btn btn-outline-secondary flex-fill" id="botaoExportarPdf">
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </button>
+    </div>
 </form>
-<?php endif; ?>
 
 <div class="row gx-2 px-1 mb-3">
     <div class="col-4">

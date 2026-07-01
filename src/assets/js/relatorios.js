@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
+    var botaoPdf = document.getElementById('botaoExportarPdf');
+    if (botaoPdf) {
+        botaoPdf.addEventListener('click', function () {
+            window.print();
+        });
+    }
+
     var elDados = document.getElementById('dados-relatorios');
     if (!elDados || typeof Chart === 'undefined') {
         return;
