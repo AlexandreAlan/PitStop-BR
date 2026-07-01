@@ -1,58 +1,29 @@
-/* PitStop BR — identidade visual */
-
-@font-face {
-    font-family: 'Space Grotesk';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('../fonts/space-grotesk-500.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'Space Grotesk';
-    font-style: normal;
-    font-weight: 600;
-    font-display: swap;
-    src: url('../fonts/space-grotesk-600.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'Space Grotesk';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('../fonts/space-grotesk-700.woff2') format('woff2');
-}
-
-/* Fonte de 7 segmentos — imita o mostrador de LED de uma bomba de combustível de
-   verdade. Usada só nos dois números que representam "o painel do carro"
-   (km/l e gasto do mês), nunca em texto corrido. */
-@font-face {
-    font-family: 'DSEG7-Classic';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('../fonts/dseg7-classic-bold.woff2') format('woff2');
-}
+/* PitStop BR — identidade visual
+   Referência real de categoria (Drivvo, líder no Brasil): cards limpos,
+   duas cores confiantes (laranja + teal), selos de ícone coloridos,
+   números em negrito simples — não fonte de cartaz nem skeuomorfismo. */
 
 :root {
-    --ps-font-display: 'Space Grotesk', system-ui, sans-serif;
-    --ps-font-led: 'DSEG7-Classic', 'Space Grotesk', monospace;
-    --ps-led-cor: #ff8a3d;
-    --ps-led-fundo: #1a1005;
-    --ps-bg: #f4f6f9;
+    --ps-bg: #f3f2ee;
     --ps-ink: #13151a;
     --ps-dark: #1c1f26;
     --ps-dark-2: #23272f;
+
     --ps-primary: #ff6b35;
     --ps-primary-rgb: 255, 107, 53;
     --ps-primary-dark: #e8551f;
     --ps-primary-light: #ffb35c;
+
+    /* Teal — a segunda cor confiante, pro selo de ícone/gráficos secundários */
+    --ps-teal: #0e8a8f;
+    --ps-teal-rgb: 14, 138, 143;
+    --ps-teal-dark: #0b6d71;
+
     --ps-success: #2ecc71;
     --ps-danger: #e74c3c;
     --ps-shadow-rgb: 19, 21, 26;
-    --ps-radius-lg: 1.25rem;
-    --ps-radius-md: 1rem;
+    --ps-radius-lg: 1rem;
+    --ps-radius-md: .75rem;
     --ps-ease: cubic-bezier(.22, .68, 0, 1);
 
     /* sobrepõe a paleta padrão do Bootstrap pela identidade da marca */
@@ -98,17 +69,20 @@
 .bg-success   { background-color: var(--ps-success) !important; }
 
 body {
-    background:
-        radial-gradient(1100px 480px at 50% 0%, rgba(var(--ps-primary-rgb), .07), transparent 65%),
-        var(--ps-bg);
+    background-color: var(--ps-bg);
 }
 
 .stat-valor,
-.valor-registro {
-    font-family: var(--ps-font-display);
-    font-weight: 600;
+.valor-registro,
+.valor-destaque {
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+}
+
+.valor-destaque {
+    font-size: 1.25rem;
+    color: var(--ps-ink);
 }
 
 .brand-logo {
@@ -118,7 +92,6 @@ body {
 }
 
 .brand-wordmark {
-    font-family: var(--ps-font-display);
     font-weight: 700;
     letter-spacing: 0.01em;
 }
@@ -160,6 +133,30 @@ body {
     display: none;
 }
 
+/* Selo de ícone — pequeno quadrado colorido com ícone branco, ao lado de
+   cada estatística. Alterna laranja/teal pra dar variedade sem virar bagunça. */
+.icone-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: .6rem;
+    color: #fff;
+    font-size: 1.05rem;
+    flex-shrink: 0;
+}
+
+.icone-chip-laranja { background: var(--ps-primary); }
+.icone-chip-teal    { background: var(--ps-teal); }
+
+.gasto-mes-linha {
+    display: inline-flex;
+    align-items: center;
+    gap: .65rem;
+    margin-top: .35rem;
+}
+
 .card-resumo {
     margin: -1.5rem 1rem 1.5rem;
     border-radius: var(--ps-radius-lg);
@@ -167,36 +164,7 @@ body {
     box-shadow: 0 2px 8px rgba(var(--ps-shadow-rgb), .06), 0 12px 28px rgba(var(--ps-shadow-rgb), .08);
 }
 
-.fab {
-    position: fixed;
-    bottom: 88px;
-    right: 24px;
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.75rem;
-    box-shadow: 0 4px 14px rgba(var(--ps-primary-rgb), .45);
-    z-index: 1030;
-    background-color: var(--ps-primary);
-    border-color: var(--ps-primary);
-    transition: transform .15s var(--ps-ease), box-shadow .15s var(--ps-ease);
-}
-
-.fab:active {
-    transform: scale(.92);
-}
-
-/* Reserva espaço pro FAB não tampar o conteúdo (valor/ações) dos cards da lista.
-   !important necessário pra vencer a utility .px-1 do Bootstrap, que também usa !important. */
-@media (max-width: 991.98px) {
-    .lista-registros {
-        padding-right: 4.75rem !important;
-    }
-}
-
+/* Reserva espaço pra ação de novo registro não colar na borda dos cards da lista */
 .registro-info {
     min-width: 0;
 }
@@ -205,12 +173,6 @@ body {
     flex-shrink: 0;
     white-space: nowrap;
     margin-left: .5rem;
-}
-
-@media (min-width: 992px) {
-    .fab {
-        display: none;
-    }
 }
 
 /* Estado vazio — convite à ação, não uma frase perdida no vazio */
@@ -233,7 +195,6 @@ body {
 }
 
 .estado-vazio-titulo {
-    font-family: var(--ps-font-display);
     font-weight: 600;
     font-size: 1.05rem;
     margin-bottom: .35rem;
@@ -262,61 +223,6 @@ body {
     opacity: .6;
 }
 
-/* Odômetro — visor de LED de bomba de combustível de verdade, a assinatura visual do painel */
-.odometro {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-}
-
-.odometro-prefixo {
-    color: #8a8f98;
-    font-size: .75rem;
-    font-weight: 600;
-    letter-spacing: .02em;
-}
-
-.odometro-visor {
-    display: inline-flex;
-    align-items: center;
-    background: var(--ps-led-fundo);
-    border-radius: .45rem;
-    padding: .3rem .5rem;
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .03);
-}
-
-.odometro-digito,
-.odometro-separador {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--ps-font-led);
-    font-size: 1.1rem;
-    line-height: 1;
-}
-
-.odometro-digito {
-    min-width: .85rem;
-    color: var(--ps-led-cor);
-    text-shadow: 0 0 6px rgba(255, 138, 61, .7), 0 0 14px rgba(255, 138, 61, .35);
-}
-
-/* O "fantasma" do 8 apagado atrás de cada dígito — o detalhe que faz parecer
-   um visor de LED de verdade, não só um número numa fonte diferente. */
-.odometro-digito::before {
-    content: "8";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    color: rgba(255, 138, 61, .09);
-}
-
-.odometro-separador {
-    color: rgba(255, 138, 61, .85);
-    min-width: .35rem;
-}
-
 .lista-registros .card,
 .lista-veiculos .card {
     border: none;
@@ -331,13 +237,16 @@ body {
     box-shadow: 0 1px 2px rgba(var(--ps-shadow-rgb), .05);
 }
 
-/* Navegação inferior — uso diário em uma mão, padrão de app mobile */
+/* Navegação inferior — uso diário em uma mão, padrão de app mobile.
+   O "+" mora dentro da barra (elevado, ao centro), não flutuando por cima
+   do conteúdo — assim ele nunca tampa o valor de um registro na lista. */
 .bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     display: flex;
+    align-items: flex-end;
     background-color: #fff;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
@@ -373,6 +282,26 @@ body {
 
 .bottom-nav a:active i {
     transform: scale(.85);
+}
+
+.bottom-nav a.nav-fab {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    margin: 0 .35rem -18px;
+    border-radius: 50%;
+    background: var(--ps-primary);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(var(--ps-primary-rgb), .45);
+    border: 3px solid #fff;
+}
+
+.bottom-nav a.nav-fab i {
+    font-size: 1.5rem;
+}
+
+.bottom-nav a.nav-fab:active {
+    transform: scale(.92);
 }
 
 body { padding-bottom: 76px; }
@@ -439,6 +368,12 @@ body { padding-bottom: 76px; }
     .bottom-nav a.ativo i {
         transform: none;
     }
+
+    /* No desktop já existe o botão "Novo Registro" no topo da lista —
+       o "+" da navegação (pensado pra uso com o polegar no celular) some daqui */
+    .bottom-nav a.nav-fab {
+        display: none;
+    }
 }
 
 /* Telas de autenticação */
@@ -454,11 +389,6 @@ body { padding-bottom: 76px; }
 .auth-card {
     width: 100%;
     max-width: 380px;
-}
-
-.auth-card h1 {
-    font-family: var(--ps-font-display);
-    font-weight: 600;
 }
 
 .auth-logo {
@@ -532,10 +462,6 @@ body { padding-bottom: 76px; }
     .lista-registros .card:nth-child(4), .lista-veiculos .card:nth-child(4) { animation-delay: .14s; }
     .lista-registros .card:nth-child(5), .lista-veiculos .card:nth-child(5) { animation-delay: .18s; }
     .lista-registros .card:nth-child(n+6), .lista-veiculos .card:nth-child(n+6) { animation-delay: .2s; }
-
-    .fab {
-        animation: ps-pulso 2.6s ease-in-out 1.2s infinite;
-    }
 }
 
 @keyframes ps-entrada {
@@ -543,12 +469,7 @@ body { padding-bottom: 76px; }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes ps-pulso {
-    0%, 100% { box-shadow: 0 4px 14px rgba(var(--ps-primary-rgb), .45); }
-    50%      { box-shadow: 0 4px 22px rgba(var(--ps-primary-rgb), .7); }
-}
-
-/* Medidor (gauge) animado da última média — momento de assinatura da marca */
+/* Medidor (gauge) animado da última média */
 .medidor {
     position: relative;
     width: 200px;
@@ -593,11 +514,11 @@ body { padding-bottom: 76px; }
 }
 
 .medidor-valor {
-    font-family: var(--ps-font-led);
-    font-size: 2.1rem;
+    font-size: 2rem;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
     color: var(--ps-success);
-    text-shadow: 0 0 8px rgba(46, 204, 113, .5), 0 0 18px rgba(46, 204, 113, .25);
 }
 
 .medidor-unidade {
