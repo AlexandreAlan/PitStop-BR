@@ -24,8 +24,22 @@
     src: url('../fonts/space-grotesk-700.woff2') format('woff2');
 }
 
+/* Fonte de 7 segmentos — imita o mostrador de LED de uma bomba de combustível de
+   verdade. Usada só nos dois números que representam "o painel do carro"
+   (km/l e gasto do mês), nunca em texto corrido. */
+@font-face {
+    font-family: 'DSEG7-Classic';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/dseg7-classic-bold.woff2') format('woff2');
+}
+
 :root {
     --ps-font-display: 'Space Grotesk', system-ui, sans-serif;
+    --ps-font-led: 'DSEG7-Classic', 'Space Grotesk', monospace;
+    --ps-led-cor: #ff8a3d;
+    --ps-led-fundo: #1a1005;
     --ps-bg: #f4f6f9;
     --ps-ink: #13151a;
     --ps-dark: #1c1f26;
@@ -248,40 +262,59 @@ body {
     opacity: .6;
 }
 
-/* Odômetro — mostrador de dígitos, a assinatura visual do painel */
+/* Odômetro — visor de LED de bomba de combustível de verdade, a assinatura visual do painel */
 .odometro {
     display: inline-flex;
     align-items: center;
-    gap: .2rem;
-    font-family: var(--ps-font-display);
+    gap: .4rem;
 }
 
 .odometro-prefixo {
     color: #8a8f98;
-    font-size: .8rem;
+    font-size: .75rem;
     font-weight: 600;
-    margin-right: .15rem;
+    letter-spacing: .02em;
 }
 
-.odometro-digito {
+.odometro-visor {
+    display: inline-flex;
+    align-items: center;
+    background: var(--ps-led-fundo);
+    border-radius: .45rem;
+    padding: .3rem .5rem;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .03);
+}
+
+.odometro-digito,
+.odometro-separador {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.15rem;
-    padding: .1rem .05rem;
-    background: var(--ps-dark);
-    color: var(--ps-primary-light);
-    border-radius: .3rem;
-    font-weight: 600;
-    font-size: .95rem;
-    font-variant-numeric: tabular-nums;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35);
+    font-family: var(--ps-font-led);
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.odometro-digito {
+    min-width: .85rem;
+    color: var(--ps-led-cor);
+    text-shadow: 0 0 6px rgba(255, 138, 61, .7), 0 0 14px rgba(255, 138, 61, .35);
+}
+
+/* O "fantasma" do 8 apagado atrás de cada dígito — o detalhe que faz parecer
+   um visor de LED de verdade, não só um número numa fonte diferente. */
+.odometro-digito::before {
+    content: "8";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    color: rgba(255, 138, 61, .09);
 }
 
 .odometro-separador {
-    color: #8a8f98;
-    font-weight: 700;
-    font-size: .8rem;
+    color: rgba(255, 138, 61, .85);
+    min-width: .35rem;
 }
 
 .lista-registros .card,
@@ -560,11 +593,11 @@ body { padding-bottom: 76px; }
 }
 
 .medidor-valor {
-    font-size: 2rem;
-    font-weight: 800;
+    font-family: var(--ps-font-led);
+    font-size: 2.1rem;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
     color: var(--ps-success);
+    text-shadow: 0 0 8px rgba(46, 204, 113, .5), 0 0 18px rgba(46, 204, 113, .25);
 }
 
 .medidor-unidade {
