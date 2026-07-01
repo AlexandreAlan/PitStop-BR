@@ -132,6 +132,7 @@ require __DIR__ . '/includes/header.php';
     <div class="col-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-laranja mb-2" aria-hidden="true"><i class="bi bi-cash-stack"></i></span>
                 <p class="text-muted small mb-1">Total Gasto</p>
                 <p class="fw-bold mb-0 small stat-valor"><?= h(formatarMoeda($totalGasto)) ?></p>
             </div>
@@ -140,6 +141,7 @@ require __DIR__ . '/includes/header.php';
     <div class="col-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-calendar3"></i></span>
                 <p class="text-muted small mb-1">Gasto Médio/Dia</p>
                 <p class="fw-bold mb-0 small stat-valor"><?= $gastoMedioDia !== null ? h(formatarMoeda($gastoMedioDia)) : '—' ?></p>
             </div>
@@ -148,6 +150,7 @@ require __DIR__ . '/includes/header.php';
     <div class="col-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-laranja mb-2" aria-hidden="true"><i class="bi bi-fuel-pump"></i></span>
                 <p class="text-muted small mb-1">Preço Médio/L</p>
                 <p class="fw-bold mb-0 small stat-valor"><?= $precoMedioLitro !== null ? h(formatarMoeda($precoMedioLitro)) : '—' ?></p>
             </div>
