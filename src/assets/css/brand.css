@@ -337,13 +337,13 @@ body {
     transform: scale(.92);
 }
 
-body { padding-bottom: 86px; }
+body.tem-bottom-nav { padding-bottom: 86px; }
 
 /* Telas ≥992px: a barra de abas mobile vira uma sidebar compacta,
    e o conteúdo ganha uma largura de leitura própria em vez de esticar
    a coluna mobile no meio de um vazio cinza */
 @media (min-width: 992px) {
-    body { padding-bottom: 0; }
+    body.tem-bottom-nav { padding-bottom: 0; }
 
     .app-shell {
         display: flex;
