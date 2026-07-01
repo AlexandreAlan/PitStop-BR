@@ -567,3 +567,32 @@ body { padding-bottom: 76px; }
     padding: .1rem .35rem;
     border-radius: .4rem;
 }
+
+/* Impressão dos Relatórios — "Exportar PDF" é o próprio diálogo de
+   impressão do navegador (Salvar como PDF), sem depender de biblioteca */
+@media print {
+    .header-dark,
+    .bottom-nav,
+    #formFiltroVeiculo,
+    .estado-vazio-mini {
+        display: none !important;
+    }
+
+    body, main.container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .app-shell {
+        display: block !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+        break-inside: avoid;
+    }
+}
