@@ -60,3 +60,34 @@ function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): 
 
     return round($kmRodado / $litros, 1);
 }
+
+/**
+ * Status de um lembrete de manutenção: 'vencido', 'proximo' ou 'ok'.
+ * Lembrete por KM usa o km_atual_veiculo (maior km_atual já registrado pro
+ * veículo); sem nenhum registro ainda, considera "ok" (não dá pra saber).
+ */
+function calcularStatusLembrete(array $lembrete): array
+{
+    $rotulos = [
+        'vencido' => ['Vencido', 'bg-danger'],
+        'proximo' => ['Próximo', 'bg-warning text-dark'],
+        'ok'      => ['Em dia', 'bg-success'],
+    ];
+
+    if ($lembrete['tipo_alvo'] === 'Data') {
+        $hoje = new DateTime('today');
+        $alvo = new DateTime((string) $lembrete['data_alvo']);
+        $dias = (int) $hoje->diff($alvo)->format('%r%a');
+        $status = $dias < 0 ? 'vencido' : ($dias <= 15 ? 'proximo' : 'ok');
+    } else {
+        $atual = $lembrete['km_atual_veiculo'] !== null ? (int) $lembrete['km_atual_veiculo'] : null;
+        if ($atual === null) {
+            $status = 'ok';
+        } else {
+            $restante = (int) $lembrete['km_alvo'] - $atual;
+            $status = $restante <= 0 ? 'vencido' : ($restante <= 500 ? 'proximo' : 'ok');
+        }
+    }
+
+    return ['status' => $status, 'rotulo' => $rotulos[$status][0], 'classe' => $rotulos[$status][1]];
+}
