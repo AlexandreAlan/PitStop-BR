@@ -18,14 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $resultado = loginUsuario($pdo, $email, $senha);
     if ($resultado['ok']) {
+        if (!empty($resultado['precisaVerificar'])) {
+            header('Location: verificar_email.php');
+            exit;
+        }
         header('Location: index.php');
         exit;
     }
 
     $erros[] = $resultado['erro'];
 }
-
-$existeAlgumUsuario = (int) $pdo->query('SELECT COUNT(*) FROM usuarios')->fetchColumn() > 0;
 
 $tituloPagina = 'Entrar';
 $telaAuth = true;
@@ -46,12 +48,12 @@ require __DIR__ . '/includes/header.php';
 
         <div class="mb-3">
             <label class="form-label">E-mail</label>
-            <input type="email" name="email" class="form-control form-control-lg" value="<?= h($email) ?>" required autofocus>
+            <input type="email" name="email" class="form-control form-control-lg" value="<?= h($email) ?>" autocomplete="email" required autofocus>
         </div>
 
         <div class="mb-4">
             <label class="form-label">Senha</label>
-            <input type="password" name="senha" class="form-control form-control-lg" required>
+            <input type="password" name="senha" class="form-control form-control-lg" autocomplete="current-password" required>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
@@ -59,11 +61,7 @@ require __DIR__ . '/includes/header.php';
         </button>
 
         <p class="text-center text-muted small mb-0">
-            <?php if ($existeAlgumUsuario): ?>
-                Não tem conta? Peça um convite a alguém que já usa o PitStop BR.
-            <?php else: ?>
-                Não tem conta? <a href="cadastro.php">Cadastre-se</a>
-            <?php endif; ?>
+            Não tem conta? <a href="cadastro.php">Cadastre-se</a>
         </p>
     </div>
 </form>
