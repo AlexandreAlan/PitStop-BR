@@ -346,7 +346,25 @@ body {
     transform: scale(.92);
 }
 
-body.tem-bottom-nav { padding-bottom: 86px; }
+/* Página inteira preenche a altura real da tela (100dvh — leva em conta a
+   barra do navegador/app, diferente de 100vh puro em mobile) e vira uma
+   coluna flex. Sem isso, quando o conteúdo é curto (ex.: estado vazio, sem
+   registros ainda), sobra um vão cinza grande entre o card e o menu de
+   baixo — "a tela não se ajusta ao aparelho". Com o flex, o bloco de lista
+   (.lista-registros/.lista-veiculos/.lista-lembretes, abaixo) cresce pra
+   preencher esse espaço e centraliza o estado vazio nele. */
+body.tem-bottom-nav {
+    padding-bottom: 86px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
 
 /* Layout mobile é o padrão pra QUALQUER dispositivo — nunca deixa o Bootstrap
    aplicar os max-width fixos dos próprios breakpoints (540/720/960px). O
@@ -360,6 +378,30 @@ body.tem-bottom-nav { padding-bottom: 86px; }
    em JS, a única fonte confiável de "isso tem tela de toque". */
 main.container {
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+/* O bloco de lista cresce pra ocupar o espaço sobrando na tela; dentro dele,
+   só o estado vazio (sem registro/veículo/lembrete ainda) centraliza — a
+   lista com dados de verdade continua alinhada no topo, sem esticar. */
+.lista-registros,
+.lista-veiculos,
+.lista-lembretes {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.lista-registros .estado-vazio,
+.lista-veiculos .estado-vazio,
+.lista-lembretes .estado-vazio {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 @media (min-width: 992px) {
