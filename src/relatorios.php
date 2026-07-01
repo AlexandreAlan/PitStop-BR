@@ -156,6 +156,24 @@ foreach ($consumoBruto as $c) {
     }
 }
 
+// Comparação com o consumo de fábrica — só faz sentido com 1 veículo
+// selecionado (misturar veículos diferentes no mesmo km/l não diz nada).
+$consumoFabrica = null;
+$consumoMedioReal = null;
+if ($veiculoIdFiltro !== null) {
+    $stmt = $pdo->prepare(
+        'SELECT m.consumo_cidade_kml, m.consumo_estrada_kml
+         FROM veiculos v INNER JOIN modelos_veiculos m ON m.id = v.modelo_veiculo_id
+         WHERE v.id = :veiculo_id AND v.usuario_id = :usuario_id'
+    );
+    $stmt->execute([':veiculo_id' => $veiculoIdFiltro, ':usuario_id' => $usuario['id']]);
+    $consumoFabrica = $stmt->fetch() ?: null;
+
+    if ($consumoFabrica !== null && $consumo) {
+        $consumoMedioReal = round(array_sum(array_column($consumo, 'kml')) / count($consumo), 1);
+    }
+}
+
 $labelsGastoMes = array_map(static fn($g) => $g['mes'], $gastoPorMes);
 $valoresGastoMes = array_map(static fn($g) => (float) $g['total'], $gastoPorMes);
 $labelsKmMes = array_map(static fn($k) => $k['mes'], $kmPorMes);
@@ -255,6 +273,43 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($consumoFabrica !== null && $consumoMedioReal !== null): ?>
+<div class="px-1 mb-4">
+    <h6 class="text-muted mb-2">Seu Consumo vs. Fábrica</h6>
+    <div class="card shadow-sm border-0">
+        <div class="card-body py-3 px-3">
+            <div class="row text-center gx-2">
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Seu consumo</p>
+                    <p class="fw-bold mb-0 stat-valor"><?= h(number_format($consumoMedioReal, 1, ',', '.')) ?> km/l</p>
+                </div>
+                <?php if ($consumoFabrica['consumo_cidade_kml']): ?>
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Fábrica (cidade)</p>
+                    <p class="fw-bold mb-0 stat-valor"><?= h(number_format((float) $consumoFabrica['consumo_cidade_kml'], 1, ',', '.')) ?> km/l</p>
+                </div>
+                <?php endif; ?>
+                <?php if ($consumoFabrica['consumo_estrada_kml']): ?>
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Fábrica (estrada)</p>
+                    <p class="fw-bold mb-0 stat-valor"><?= h(number_format((float) $consumoFabrica['consumo_estrada_kml'], 1, ',', '.')) ?> km/l</p>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php if ($consumoFabrica['consumo_cidade_kml']):
+                $diferenca = round((($consumoMedioReal / (float) $consumoFabrica['consumo_cidade_kml']) - 1) * 100);
+            ?>
+            <p class="text-muted small text-center mb-0 mt-2">
+                <?= $diferenca >= 0
+                    ? 'Você está rendendo ' . abs($diferenca) . '% a mais que o consumo de cidade informado pelo fabricante.'
+                    : 'Você está rendendo ' . abs($diferenca) . '% a menos que o consumo de cidade informado pelo fabricante.' ?>
+            </p>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="px-1 mb-4">
     <h6 class="text-muted mb-2">Evolução do Consumo (km/l)</h6>
