@@ -58,13 +58,43 @@ async function interceptarFormulariosOffline() {
         const config = mapaFormularios[seletor];
 
         form.addEventListener('submit', function (evento) {
-            // Online: deixa o formulário submeter normalmente pro PHP (comportamento já testado).
-            if (navigator.onLine) return;
-
             evento.preventDefault();
-            enviarParaFilaOffline(form, config);
+            prosseguirComEnvio(form, config);
         });
     });
+}
+
+async function prosseguirComEnvio(form, config) {
+    if (await conexaoRealDisponivel()) {
+        // HTMLFormElement.prototype.submit() não dispara o evento 'submit' de novo
+        // (é assim que a spec define) — segue pro POST normal pro PHP, comportamento
+        // já testado, sem risco de loop com o listener acima.
+        HTMLFormElement.prototype.submit.call(form);
+        return;
+    }
+    enviarParaFilaOffline(form, config);
+}
+
+/**
+ * navigator.onLine só diz se o rádio (wifi/dados) está ligado, não se chega
+ * internet de verdade — wifi conectado num roteador sem internet, por
+ * exemplo, ainda reporta "online". Confiar só nisso faz o app tentar mandar
+ * o formulário direto pro servidor sem conexão real, e o navegador trava
+ * numa tela de erro genérica ou no aviso de "confirmar reenvio do
+ * formulário". Por isso, mesmo com navigator.onLine=true, testa uma busca
+ * real e rápida antes de decidir.
+ */
+async function conexaoRealDisponivel() {
+    if (!navigator.onLine) return false;
+    try {
+        const controlador = new AbortController();
+        const tempoLimite = setTimeout(function () { controlador.abort(); }, 2500);
+        await fetch('/manifest.json', { method: 'HEAD', cache: 'no-store', signal: controlador.signal });
+        clearTimeout(tempoLimite);
+        return true;
+    } catch (erro) {
+        return false;
+    }
 }
 
 async function enviarParaFilaOffline(form, config) {
