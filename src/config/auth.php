@@ -4,6 +4,8 @@ declare(strict_types=1);
 const AUTH_MAX_TENTATIVAS = 5;
 const AUTH_BLOQUEIO_MINUTOS = 15;
 const AUTH_SENHA_MIN = 8;
+const AUTH_CODIGO_VALIDADE_MINUTOS = 15;
+const AUTH_CODIGO_MAX_TENTATIVAS = 5;
 
 function usuarioAtual(): ?array
 {
@@ -14,6 +16,7 @@ function usuarioAtual(): ?array
     return [
         'id'   => (int) $_SESSION['usuario_id'],
         'nome' => (string) ($_SESSION['usuario_nome'] ?? ''),
+        'role' => (string) ($_SESSION['usuario_role'] ?? 'user'),
     ];
 }
 
@@ -28,6 +31,17 @@ function exigirLogin(): array
     return $usuario;
 }
 
+function exigirAdmin(): array
+{
+    $usuario = exigirLogin();
+    if ($usuario['role'] !== 'admin') {
+        http_response_code(404);
+        die('Página não encontrada.');
+    }
+
+    return $usuario;
+}
+
 function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, bool $aceitouPrivacidade): array
 {
     $nome  = trim($nome);
@@ -35,6 +49,9 @@ function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, 
 
     if ($nome === '' || mb_strlen($nome) > 100) {
         return ['ok' => false, 'erro' => 'Informe seu nome (máx. 100 caracteres).'];
+    }
+    if (!preg_match('/\S+\s+\S+/u', $nome)) {
+        return ['ok' => false, 'erro' => 'Informe nome e sobrenome.'];
     }
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
         return ['ok' => false, 'erro' => 'E-mail inválido.'];
@@ -61,13 +78,70 @@ function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, 
     return ['ok' => true, 'id' => (int) $pdo->lastInsertId(), 'nome' => $nome];
 }
 
+/**
+ * Gera um código de 6 dígitos, guarda só o hash (nunca o código em claro) e
+ * devolve o código pra ser mandado por e-mail. Cadastro só é considerado
+ * confirmado (LGPD: prova de titularidade do e-mail) depois de validado
+ * em verificarCodigoEmail().
+ */
+function gerarCodigoVerificacao(PDO $pdo, int $usuarioId): string
+{
+    $codigo = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    $expiraEm = (new DateTime())->modify('+' . AUTH_CODIGO_VALIDADE_MINUTOS . ' minutes')->format('Y-m-d H:i:s');
+
+    $pdo->prepare('DELETE FROM verificacoes_email WHERE usuario_id = :id')->execute([':id' => $usuarioId]);
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO verificacoes_email (usuario_id, codigo_hash, expira_em) VALUES (:usuario_id, :codigo_hash, :expira_em)'
+    );
+    $stmt->execute([
+        ':usuario_id'  => $usuarioId,
+        ':codigo_hash' => hash('sha256', $codigo),
+        ':expira_em'   => $expiraEm,
+    ]);
+
+    return $codigo;
+}
+
+function verificarCodigoEmail(PDO $pdo, int $usuarioId, string $codigo): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT id, codigo_hash, tentativas, expira_em FROM verificacoes_email
+         WHERE usuario_id = :usuario_id ORDER BY criado_em DESC LIMIT 1'
+    );
+    $stmt->execute([':usuario_id' => $usuarioId]);
+    $registro = $stmt->fetch();
+
+    if (!$registro) {
+        return ['ok' => false, 'erro' => 'Nenhum código pendente. Peça um novo código.'];
+    }
+    if ((int) $registro['tentativas'] >= AUTH_CODIGO_MAX_TENTATIVAS) {
+        return ['ok' => false, 'erro' => 'Muitas tentativas erradas. Peça um novo código.'];
+    }
+    if (new DateTime($registro['expira_em']) < new DateTime()) {
+        return ['ok' => false, 'erro' => 'Código expirado. Peça um novo código.'];
+    }
+
+    if (!hash_equals($registro['codigo_hash'], hash('sha256', $codigo))) {
+        $pdo->prepare('UPDATE verificacoes_email SET tentativas = tentativas + 1 WHERE id = :id')
+            ->execute([':id' => $registro['id']]);
+        return ['ok' => false, 'erro' => 'Código incorreto.'];
+    }
+
+    $pdo->prepare('UPDATE usuarios SET email_verificado_em = NOW() WHERE id = :id')->execute([':id' => $usuarioId]);
+    $pdo->prepare('DELETE FROM verificacoes_email WHERE usuario_id = :id')->execute([':id' => $usuarioId]);
+
+    return ['ok' => true];
+}
+
 function loginUsuario(PDO $pdo, string $email, string $senha): array
 {
     $email = mb_strtolower(trim($email));
     $erroGenerico = ['ok' => false, 'erro' => 'E-mail ou senha inválidos.'];
 
     $stmt = $pdo->prepare(
-        'SELECT id, nome, senha_hash, tentativas_falhas, bloqueado_ate FROM usuarios WHERE email = :email'
+        'SELECT id, nome, role, senha_hash, tentativas_falhas, bloqueado_ate, email_verificado_em
+         FROM usuarios WHERE email = :email'
     );
     $stmt->execute([':email' => $email]);
     $usuario = $stmt->fetch();
@@ -96,9 +170,16 @@ function loginUsuario(PDO $pdo, string $email, string $senha): array
     $upd = $pdo->prepare('UPDATE usuarios SET tentativas_falhas = 0, bloqueado_ate = NULL WHERE id = :id');
     $upd->execute([':id' => $usuario['id']]);
 
+    if ($usuario['email_verificado_em'] === null) {
+        session_regenerate_id(true);
+        $_SESSION['verificacao_pendente_id'] = (int) $usuario['id'];
+        return ['ok' => true, 'precisaVerificar' => true];
+    }
+
     session_regenerate_id(true);
     $_SESSION['usuario_id']   = (int) $usuario['id'];
     $_SESSION['usuario_nome'] = $usuario['nome'];
+    $_SESSION['usuario_role'] = $usuario['role'];
 
     return ['ok' => true];
 }
