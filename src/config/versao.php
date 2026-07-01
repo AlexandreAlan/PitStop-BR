@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.6.6';
+const APP_VERSION = '1.6.7';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.6.7',
+        'resumo'  => 'Duas correções sérias do modo offline: (1) depois de cada atualização o cache antigo era apagado e ficava vazio até você visitar cada tela de novo — agora recarrega sozinho, na hora, se você já estiver logado; (2) o app confiava demais no aviso de "conectado" do celular (que engana quando tem wifi/dados sem internet de verdade) e podia travar no aviso de "reenviar formulário" — agora ele testa a conexão de verdade antes de tentar enviar.',
+    ],
     [
         'versao'  => '1.6.6',
         'resumo'  => 'Correção do texto/elementos aparecendo grandes demais dentro do app instalado (mas normais no navegador): o Android tem um recurso de "aumentar a fonte sozinho pra ficar legível" que só age dentro do app, e ele estava sem essa trava.',
