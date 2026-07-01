@@ -17,10 +17,14 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - Login com bloqueio temporário após tentativas falhas
 - Cadastro, edição e exclusão de veículos (nome + tipo: Moto/Carro/Outro)
 - Registro, edição e exclusão de abastecimentos (km, litros, valor pago, combustível: Gasolina
-  Comum/Aditivada, Etanol, Diesel, GNV ou Outro) e manutenções (km, valor, descrição)
+  Comum/Aditivada, Etanol, Diesel, GNV ou Outro), manutenções (km, valor, descrição) e despesas
+  (Seguro, IPVA, Estacionamento, Pedágio, Multa, Lavagem ou Outro)
+- Lembretes de manutenção/documentos por km ou por data (ex.: troca de óleo aos 40.000km, seguro
+  vencendo em uma data), com status Vencido/Próximo/Em dia e alerta no painel principal
 - Cálculo automático da última média de consumo (km/l), do preço por litro e do gasto do mês
-- Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês e evolução do consumo,
-  além de cards de gasto total, gasto médio por dia e preço médio por litro
+- Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês e evolução do consumo, cards
+  de gasto total, gasto médio por dia e preço médio por litro, filtro por veículo e por período
+  (data início/fim), e exportação em CSV ou PDF (impressão do navegador)
 - Filtro de registros e relatórios por veículo
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
@@ -75,9 +79,10 @@ pitstop-br/
     ├── login.php / cadastro.php / logout.php   # autenticação
     ├── convidar.php / convite.php              # envio e aceite de convite (registro por convite)
     ├── conta.php / privacidade.php             # minha conta (exclusão de dados) e política LGPD
-    ├── index.php           # dashboard (última média, gastos do mês, registros)
-    ├── relatorios.php      # gráficos de gasto, km rodado e consumo
-    ├── adicionar.php / registro_editar.php / excluir.php   # CRUD de registros
+    ├── index.php           # dashboard (última média, gastos do mês, alerta de lembretes, registros)
+    ├── relatorios.php      # gráficos de gasto, km rodado e consumo; filtro por período; export CSV/PDF
+    ├── adicionar.php / registro_editar.php / excluir.php   # CRUD de registros (abastecimento/manutenção/despesa)
+    ├── lembretes.php / lembrete_concluir.php / lembrete_excluir.php   # lembretes de manutenção (km ou data)
     └── veiculos.php / veiculo_editar.php / veiculo_excluir.php   # CRUD de veículos
 ```
 
@@ -136,6 +141,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.5.0  | 2026-07-01 | Categoria "Despesa" no registro (Seguro, IPVA, Estacionamento, Pedágio, Multa, Lavagem, Outro), lembretes de manutenção/documentos por km ou por data com alerta no painel principal, filtro de relatórios por período (data início/fim) e exportação em CSV ou PDF (impressão do navegador) |
 | 1.4.0  | 2026-07-01 | Redesign visual com base em pesquisa de apps reais da categoria (Drivvo): correção definitiva do bug do botão de novo registro sobrepondo valores da lista (agora embutido na barra de navegação, não mais flutuante), paleta com duas cores (laranja + teal) e selos de ícone nas estatísticas, estados vazios com ícone/texto/CTA, sidebar de navegação compacta e grade de 2 colunas nos gráficos para telas ≥992px, barras dos gráficos com largura proporcional e emojis trocados por ícones Bootstrap Icons na página de instalação |
 | 1.3.0  | 2026-06-30 | Redesign visual (cantos suaves, sombras com tom da marca, transições de toque/hover, entrada animada de página/listas, medidor (gauge) SVG animado com contagem progressiva do km/l, respeitando `prefers-reduced-motion`), app Android nativo (TWA assinado via Bubblewrap) com APK para download, Digital Asset Links (abre em tela cheia sem barra de URL) e página pública `/instalar.php` com instruções APK/PWA |
 | 1.2.0  | 2026-06-30 | Registro por convite (token único por e-mail, SMTP próprio sem dependências), conformidade LGPD (política de privacidade, consentimento, exclusão de conta), combustível no abastecimento (Gasolina Comum/Aditivada, Etanol, Diesel, GNV, Outro), preço por litro calculado, página de Relatórios com gráficos (gasto por mês, km rodado, evolução do consumo) e reorganização da navegação (dropdown de conta + bottom-nav com Relatórios) |
