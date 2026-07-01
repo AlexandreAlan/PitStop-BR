@@ -6,6 +6,16 @@ function h(?string $value): string
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * IP real do visitante. Confiável aqui porque o container web só escuta em
+ * 127.0.0.1 (ver docker-compose.yml) — só o nginx do host consegue falar
+ * com ele, então X-Real-IP sempre veio do proxy, nunca de um cliente externo.
+ */
+function clienteIp(): string
+{
+    return (string) ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+}
+
 function flashSet(string $tipo, string $mensagem): void
 {
     $_SESSION['flash'] = ['tipo' => $tipo, 'mensagem' => $mensagem];
@@ -90,4 +100,201 @@ function calcularStatusLembrete(array $lembrete): array
     }
 
     return ['status' => $status, 'rotulo' => $rotulos[$status][0], 'classe' => $rotulos[$status][1]];
+}
+
+const COMBUSTIVEIS_PERMITIDOS = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
+const CATEGORIAS_DESPESA_PERMITIDAS = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
+
+/**
+ * Valida e normaliza os dados de um registro (usado tanto pelo formulário
+ * clássico em adicionar.php quanto pela API usada pela fila offline).
+ * Retorna ['ok' => bool, 'erros' => [...], 'valores' => [...prontos pro INSERT...]].
+ */
+function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
+{
+    $erros = [];
+
+    $veiculoId        = filter_var($dados['veiculo_id'] ?? '', FILTER_VALIDATE_INT);
+    $dataStr          = (string) ($dados['data'] ?? '');
+    $kmAtual          = filter_var($dados['km_atual'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+    $tipoRegistro     = in_array($dados['tipo_registro'] ?? '', ['Abastecimento', 'Manutencao', 'Despesa'], true) ? $dados['tipo_registro'] : null;
+    $valorPago        = filter_var($dados['valor_pago'] ?? '', FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0]]);
+    $litrosStr        = (string) ($dados['litros'] ?? '');
+    $litros           = $litrosStr === '' ? null : filter_var($litrosStr, FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
+    $combustivel      = in_array($dados['combustivel'] ?? '', COMBUSTIVEIS_PERMITIDOS, true) ? $dados['combustivel'] : null;
+    $categoriaDespesa = in_array($dados['categoria_despesa'] ?? '', CATEGORIAS_DESPESA_PERMITIDAS, true) ? $dados['categoria_despesa'] : null;
+    $descricao        = trim((string) ($dados['descricao'] ?? ''));
+    $dataRegistro     = DateTime::createFromFormat('Y-m-d', $dataStr);
+
+    if (!$veiculoId) {
+        $erros[] = 'Selecione um veículo válido.';
+    } else {
+        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
+        if (!$existe->fetchColumn()) {
+            $erros[] = 'Veículo não encontrado.';
+        }
+    }
+    if (!$dataRegistro || $dataRegistro->format('Y-m-d') !== $dataStr) {
+        $erros[] = 'Data inválida.';
+    }
+    if ($kmAtual === false || $kmAtual === null) {
+        $erros[] = 'KM atual inválido.';
+    }
+    if (!$tipoRegistro) {
+        $erros[] = 'Tipo de registro inválido.';
+    }
+    if ($valorPago === false || $valorPago === null) {
+        $erros[] = 'Valor pago inválido.';
+    }
+    if ($tipoRegistro === 'Abastecimento' && !$litros) {
+        $erros[] = 'Informe os litros abastecidos.';
+    }
+    if ($tipoRegistro === 'Abastecimento' && !$combustivel) {
+        $erros[] = 'Selecione o combustível.';
+    }
+    if ($tipoRegistro === 'Despesa' && !$categoriaDespesa) {
+        $erros[] = 'Selecione a categoria da despesa.';
+    }
+    if (mb_strlen($descricao) > 255) {
+        $erros[] = 'Descrição muito longa (máx. 255 caracteres).';
+    }
+
+    if ($erros) {
+        return ['ok' => false, 'erros' => $erros, 'valores' => $dados];
+    }
+
+    return [
+        'ok'      => true,
+        'erros'   => [],
+        'valores' => [
+            'veiculo_id'        => $veiculoId,
+            'data'              => $dataRegistro->format('Y-m-d'),
+            'km_atual'          => $kmAtual,
+            'tipo_registro'     => $tipoRegistro,
+            'combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
+            'litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
+            'categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
+            'valor_pago'        => $valorPago,
+            'descricao'         => $descricao !== '' ? $descricao : null,
+        ],
+    ];
+}
+
+/**
+ * Insere um registro já validado (ver validarRegistro). $clientUuid, quando
+ * informado, torna a inserção idempotente — reenvios da fila offline com o
+ * mesmo uuid não duplicam a linha (ver UNIQUE KEY uq_registros_client_uuid).
+ */
+function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): int
+{
+    if ($clientUuid !== null) {
+        $existente = $pdo->prepare('SELECT id FROM registros WHERE client_uuid = :uuid');
+        $existente->execute([':uuid' => $clientUuid]);
+        $id = $existente->fetchColumn();
+        if ($id !== false) {
+            return (int) $id;
+        }
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, categoria_despesa, valor_pago, descricao, client_uuid)
+         VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :categoria_despesa, :valor_pago, :descricao, :client_uuid)'
+    );
+    $stmt->execute([
+        ':veiculo_id'        => $valores['veiculo_id'],
+        ':data'              => $valores['data'],
+        ':km_atual'          => $valores['km_atual'],
+        ':tipo_registro'     => $valores['tipo_registro'],
+        ':combustivel'       => $valores['combustivel'],
+        ':litros'            => $valores['litros'],
+        ':categoria_despesa' => $valores['categoria_despesa'],
+        ':valor_pago'        => $valores['valor_pago'],
+        ':descricao'         => $valores['descricao'],
+        ':client_uuid'       => $clientUuid,
+    ]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Valida e normaliza os dados de um lembrete (formulário clássico e API offline).
+ */
+function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
+{
+    $erros = [];
+
+    $veiculoId  = filter_var($dados['veiculo_id'] ?? '', FILTER_VALIDATE_INT);
+    $descricao  = trim((string) ($dados['descricao'] ?? ''));
+    $tipoAlvo   = in_array($dados['tipo_alvo'] ?? '', ['KM', 'Data'], true) ? $dados['tipo_alvo'] : null;
+    $kmAlvoStr  = (string) ($dados['km_alvo'] ?? '');
+    $kmAlvo     = $kmAlvoStr === '' ? null : filter_var($kmAlvoStr, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $dataAlvoStr = (string) ($dados['data_alvo'] ?? '');
+    $dataAlvo   = $dataAlvoStr === '' ? null : DateTime::createFromFormat('Y-m-d', $dataAlvoStr);
+
+    if (!$veiculoId) {
+        $erros[] = 'Selecione um veículo válido.';
+    } else {
+        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
+        if (!$existe->fetchColumn()) {
+            $erros[] = 'Veículo não encontrado.';
+        }
+    }
+    if ($descricao === '' || mb_strlen($descricao) > 150) {
+        $erros[] = 'Descrição inválida (máx. 150 caracteres).';
+    }
+    if (!$tipoAlvo) {
+        $erros[] = 'Selecione se o lembrete é por km ou por data.';
+    }
+    if ($tipoAlvo === 'KM' && !$kmAlvo) {
+        $erros[] = 'Informe o km alvo do lembrete.';
+    }
+    if ($tipoAlvo === 'Data' && (!$dataAlvo || $dataAlvo->format('Y-m-d') !== $dataAlvoStr)) {
+        $erros[] = 'Informe uma data alvo válida.';
+    }
+
+    if ($erros) {
+        return ['ok' => false, 'erros' => $erros, 'valores' => $dados];
+    }
+
+    return [
+        'ok'      => true,
+        'erros'   => [],
+        'valores' => [
+            'veiculo_id' => $veiculoId,
+            'descricao'  => $descricao,
+            'tipo_alvo'  => $tipoAlvo,
+            'km_alvo'    => $tipoAlvo === 'KM' ? $kmAlvo : null,
+            'data_alvo'  => $tipoAlvo === 'Data' ? $dataAlvo->format('Y-m-d') : null,
+        ],
+    ];
+}
+
+/** Insere um lembrete já validado (ver validarLembrete); idempotente via client_uuid. */
+function inserirLembrete(PDO $pdo, array $valores, ?string $clientUuid = null): int
+{
+    if ($clientUuid !== null) {
+        $existente = $pdo->prepare('SELECT id FROM lembretes WHERE client_uuid = :uuid');
+        $existente->execute([':uuid' => $clientUuid]);
+        $id = $existente->fetchColumn();
+        if ($id !== false) {
+            return (int) $id;
+        }
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO lembretes (veiculo_id, descricao, tipo_alvo, km_alvo, data_alvo, client_uuid)
+         VALUES (:veiculo_id, :descricao, :tipo_alvo, :km_alvo, :data_alvo, :client_uuid)'
+    );
+    $stmt->execute([
+        ':veiculo_id' => $valores['veiculo_id'],
+        ':descricao'  => $valores['descricao'],
+        ':tipo_alvo'  => $valores['tipo_alvo'],
+        ':km_alvo'    => $valores['km_alvo'],
+        ':data_alvo'  => $valores['data_alvo'],
+        ':client_uuid' => $clientUuid,
+    ]);
+
+    return (int) $pdo->lastInsertId();
 }
