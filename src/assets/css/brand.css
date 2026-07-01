@@ -339,27 +339,24 @@ body {
 
 body.tem-bottom-nav { padding-bottom: 86px; }
 
-/* Trava a largura do container em qualquer dispositivo touch (celular),
-   mesmo que o viewport seja mal-calculado pelo WebView (ver nota acima do
-   breakpoint desktop) — nunca deixa o Bootstrap aplicar os max-width fixos
-   dos próprios breakpoints (540/720/960px) fora do modo desktop com mouse. */
-@media not all and (pointer: fine) {
-    main.container {
-        max-width: 100%;
-    }
+/* Layout mobile é o padrão pra QUALQUER dispositivo — nunca deixa o Bootstrap
+   aplicar os max-width fixos dos próprios breakpoints (540/720/960px). O
+   layout "de PC" (sidebar/colunas largas) só é ligado depois que
+   assets/js/viewport.js confirma que é desktop de verdade e adiciona a
+   classe "is-desktop-real" no <html> (ver bloco abaixo). Não dá pra confiar
+   só em CSS (@media pointer/hover) pra essa decisão: WebViews de app
+   instalado (TWA no Android) podem relatar viewport largo, e aparelhos com
+   caneta (S Pen em Samsung, por ex.) relatam "pointer: fine" mesmo sendo
+   usados só por toque — por isso a checagem real usa navigator.maxTouchPoints
+   em JS, a única fonte confiável de "isso tem tela de toque". */
+main.container {
+    max-width: 100%;
 }
 
-/* Telas ≥992px COM mouse (pointer: fine): a barra de abas mobile vira uma
-   sidebar compacta, e o conteúdo ganha uma largura de leitura própria em
-   vez de esticar a coluna mobile no meio de um vazio cinza.
-   O "pointer: fine" é essencial: alguns WebViews (app instalado/TWA no
-   Android) relatam a largura de viewport errada pro CSS, disparando esse
-   breakpoint "desktop" sozinho num celular — travar por tipo de ponteiro
-   evita isso, já que touch é sempre "coarse", nunca "fine". */
-@media (min-width: 992px) and (pointer: fine) {
-    body.tem-bottom-nav { padding-bottom: 0; }
+@media (min-width: 992px) {
+    html.is-desktop-real body.tem-bottom-nav { padding-bottom: 0; }
 
-    .app-shell {
+    html.is-desktop-real .app-shell {
         display: flex;
         align-items: flex-start;
         gap: 2rem;
@@ -368,14 +365,14 @@ body.tem-bottom-nav { padding-bottom: 86px; }
         padding: 2rem 2rem 3rem;
     }
 
-    main.container {
+    html.is-desktop-real main.container {
         flex: 1 1 auto;
         max-width: 720px;
         margin: 0;
         padding: 0;
     }
 
-    .bottom-nav {
+    html.is-desktop-real .bottom-nav {
         order: -1;
         position: sticky;
         top: 1.5rem;
@@ -390,7 +387,7 @@ body.tem-bottom-nav { padding-bottom: 86px; }
         padding: .75rem;
     }
 
-    .bottom-nav a {
+    html.is-desktop-real .bottom-nav a {
         flex-direction: row;
         justify-content: flex-start;
         gap: .75rem;
@@ -400,25 +397,25 @@ body.tem-bottom-nav { padding-bottom: 86px; }
         transition: background-color .15s var(--ps-ease), color .15s var(--ps-ease);
     }
 
-    .bottom-nav a i {
+    html.is-desktop-real .bottom-nav a i {
         font-size: 1.15rem;
     }
 
-    .bottom-nav a:hover {
+    html.is-desktop-real .bottom-nav a:hover {
         background: rgba(var(--ps-shadow-rgb), .04);
     }
 
-    .bottom-nav a.ativo {
+    html.is-desktop-real .bottom-nav a.ativo {
         background: rgba(var(--ps-primary-rgb), .1);
     }
 
-    .bottom-nav a.ativo i {
+    html.is-desktop-real .bottom-nav a.ativo i {
         transform: none;
     }
 
     /* No desktop já existe o botão "Novo Registro" no topo da lista —
        o "+" da navegação (pensado pra uso com o polegar no celular) some daqui */
-    .bottom-nav a.nav-fab {
+    html.is-desktop-real .bottom-nav a.nav-fab {
         display: none;
     }
 }
