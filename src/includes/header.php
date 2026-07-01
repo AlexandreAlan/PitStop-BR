@@ -36,7 +36,11 @@
         <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="conta.php"><i class="bi bi-person me-2"></i>Minha Conta</a></li>
             <li><a class="dropdown-item" href="convidar.php"><i class="bi bi-send me-2"></i>Convidar Pessoas</a></li>
+            <?php if (($usuarioLogado['role'] ?? null) === 'admin'): ?>
+            <li><a class="dropdown-item" href="gerenciador.php"><i class="bi bi-speedometer me-2"></i>Painel Administrativo</a></li>
+            <?php endif; ?>
             <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item disabled versao-app-item" href="#" tabindex="-1"><i class="bi bi-info-circle me-2"></i>Versão <?= h(APP_VERSION) ?></a></li>
             <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
         </ul>
     </div>
@@ -56,4 +60,8 @@
 <?php if (empty($telaAuth)): ?>
 <div class="app-shell">
 <main class="container">
+<?php if ($usuarioLogado !== null): ?>
+<div id="aviso-atualizacao" class="d-none"></div>
+<div id="pendencias-offline" class="d-none"></div>
+<?php endif; ?>
 <?php endif; ?>
