@@ -366,16 +366,11 @@ body.tem-bottom-nav {
     flex: 1;
 }
 
-/* Layout mobile é o padrão pra QUALQUER dispositivo — nunca deixa o Bootstrap
-   aplicar os max-width fixos dos próprios breakpoints (540/720/960px). O
-   layout "de PC" (sidebar/colunas largas) só é ligado depois que
-   assets/js/viewport.js confirma que é desktop de verdade e adiciona a
-   classe "is-desktop-real" no <html> (ver bloco abaixo). Não dá pra confiar
-   só em CSS (@media pointer/hover) pra essa decisão: WebViews de app
-   instalado (TWA no Android) podem relatar viewport largo, e aparelhos com
-   caneta (S Pen em Samsung, por ex.) relatam "pointer: fine" mesmo sendo
-   usados só por toque — por isso a checagem real usa navigator.maxTouchPoints
-   em JS, a única fonte confiável de "isso tem tela de toque". */
+/* Layout mobile é o único que existe, em qualquer tamanho de tela — nunca
+   deixa o Bootstrap aplicar os max-width fixos dos próprios breakpoints
+   (540/720/960px). Não tem layout separado pra desktop/notebook de propósito
+   (ver bloco de @media (min-width: 560px) mais abaixo, que só centraliza
+   numa largura de celular, sem mudar a disposição). */
 main.container {
     max-width: 100%;
     display: flex;
@@ -404,70 +399,22 @@ main.container {
     justify-content: center;
 }
 
-@media (min-width: 992px) {
-    html.is-desktop-real body.tem-bottom-nav { padding-bottom: 0; }
-
-    html.is-desktop-real .app-shell {
-        display: flex;
-        align-items: flex-start;
-        gap: 2rem;
-        max-width: 1160px;
+/* Sem layout separado pra desktop/notebook de propósito — o app é mobile-first
+   e fica exatamente igual (uma coluna, menu embaixo) em qualquer tamanho de
+   tela; num monitor grande, só centraliza numa largura de celular em vez de
+   esticar os componentes mobile pela tela toda. */
+@media (min-width: 560px) {
+    .app-shell {
+        max-width: 480px;
         margin: 0 auto;
-        padding: 2rem 2rem 3rem;
     }
 
-    html.is-desktop-real main.container {
-        flex: 1 1 auto;
-        max-width: 720px;
-        margin: 0;
-        padding: 0;
-    }
-
-    html.is-desktop-real .bottom-nav {
-        order: -1;
-        position: sticky;
-        top: 1.5rem;
-        flex: 0 0 216px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: .25rem;
-        background: #fff;
-        border-top: none;
-        border-radius: var(--ps-radius-lg);
-        box-shadow: 0 1px 3px rgba(var(--ps-shadow-rgb), .05), 0 8px 20px rgba(var(--ps-shadow-rgb), .06);
-        padding: .75rem;
-    }
-
-    html.is-desktop-real .bottom-nav a {
-        flex-direction: row;
-        justify-content: flex-start;
-        gap: .75rem;
-        padding: .65rem .85rem;
-        font-size: .9rem;
-        border-radius: .7rem;
-        transition: background-color .15s var(--ps-ease), color .15s var(--ps-ease);
-    }
-
-    html.is-desktop-real .bottom-nav a i {
-        font-size: 1.15rem;
-    }
-
-    html.is-desktop-real .bottom-nav a:hover {
-        background: rgba(var(--ps-shadow-rgb), .04);
-    }
-
-    html.is-desktop-real .bottom-nav a.ativo {
-        background: rgba(var(--ps-primary-rgb), .1);
-    }
-
-    html.is-desktop-real .bottom-nav a.ativo i {
-        transform: none;
-    }
-
-    /* No desktop já existe o botão "Novo Registro" no topo da lista —
-       o "+" da navegação (pensado pra uso com o polegar no celular) some daqui */
-    html.is-desktop-real .bottom-nav a.nav-fab {
-        display: none;
+    .bottom-nav {
+        left: 50%;
+        right: auto;
+        width: 100%;
+        max-width: 480px;
+        transform: translateX(-50%);
     }
 }
 
