@@ -5,38 +5,42 @@ require_once __DIR__ . '/config/bootstrap.php';
 $usuario = exigirLogin();
 
 $combustiveisPermitidos = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
+$categoriasDespesaPermitidas = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
 
 $erros = [];
 $dados = [
-    'veiculo_id'    => '',
-    'data'          => date('Y-m-d'),
-    'km_atual'      => '',
-    'tipo_registro' => 'Abastecimento',
-    'combustivel'   => '',
-    'litros'        => '',
-    'valor_pago'    => '',
-    'descricao'     => '',
+    'veiculo_id'        => '',
+    'data'              => date('Y-m-d'),
+    'km_atual'          => '',
+    'tipo_registro'     => 'Abastecimento',
+    'combustivel'       => '',
+    'litros'            => '',
+    'categoria_despesa' => '',
+    'valor_pago'        => '',
+    'descricao'         => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrfVerificarOuFalhar();
 
-    $dados['veiculo_id']    = (string) ($_POST['veiculo_id'] ?? '');
-    $dados['data']          = (string) ($_POST['data'] ?? '');
-    $dados['km_atual']      = (string) ($_POST['km_atual'] ?? '');
-    $dados['tipo_registro'] = (string) ($_POST['tipo_registro'] ?? '');
-    $dados['combustivel']   = (string) ($_POST['combustivel'] ?? '');
-    $dados['litros']        = (string) ($_POST['litros'] ?? '');
-    $dados['valor_pago']    = (string) ($_POST['valor_pago'] ?? '');
-    $dados['descricao']     = trim((string) ($_POST['descricao'] ?? ''));
+    $dados['veiculo_id']        = (string) ($_POST['veiculo_id'] ?? '');
+    $dados['data']              = (string) ($_POST['data'] ?? '');
+    $dados['km_atual']          = (string) ($_POST['km_atual'] ?? '');
+    $dados['tipo_registro']     = (string) ($_POST['tipo_registro'] ?? '');
+    $dados['combustivel']       = (string) ($_POST['combustivel'] ?? '');
+    $dados['litros']            = (string) ($_POST['litros'] ?? '');
+    $dados['categoria_despesa'] = (string) ($_POST['categoria_despesa'] ?? '');
+    $dados['valor_pago']        = (string) ($_POST['valor_pago'] ?? '');
+    $dados['descricao']         = trim((string) ($_POST['descricao'] ?? ''));
 
-    $veiculoId     = filter_var($dados['veiculo_id'], FILTER_VALIDATE_INT);
-    $kmAtual       = filter_var($dados['km_atual'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-    $tipoRegistro  = in_array($dados['tipo_registro'], ['Abastecimento', 'Manutencao'], true) ? $dados['tipo_registro'] : null;
-    $valorPago     = filter_var($dados['valor_pago'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0]]);
-    $litros        = $dados['litros'] === '' ? null : filter_var($dados['litros'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
-    $combustivel   = in_array($dados['combustivel'], $combustiveisPermitidos, true) ? $dados['combustivel'] : null;
-    $dataRegistro  = DateTime::createFromFormat('Y-m-d', $dados['data']);
+    $veiculoId        = filter_var($dados['veiculo_id'], FILTER_VALIDATE_INT);
+    $kmAtual          = filter_var($dados['km_atual'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+    $tipoRegistro     = in_array($dados['tipo_registro'], ['Abastecimento', 'Manutencao', 'Despesa'], true) ? $dados['tipo_registro'] : null;
+    $valorPago        = filter_var($dados['valor_pago'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0]]);
+    $litros           = $dados['litros'] === '' ? null : filter_var($dados['litros'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
+    $combustivel      = in_array($dados['combustivel'], $combustiveisPermitidos, true) ? $dados['combustivel'] : null;
+    $categoriaDespesa = in_array($dados['categoria_despesa'], $categoriasDespesaPermitidas, true) ? $dados['categoria_despesa'] : null;
+    $dataRegistro     = DateTime::createFromFormat('Y-m-d', $dados['data']);
 
     if (!$veiculoId) {
         $erros[] = 'Selecione um veículo válido.';
@@ -65,24 +69,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($tipoRegistro === 'Abastecimento' && !$combustivel) {
         $erros[] = 'Selecione o combustível.';
     }
+    if ($tipoRegistro === 'Despesa' && !$categoriaDespesa) {
+        $erros[] = 'Selecione a categoria da despesa.';
+    }
     if (mb_strlen($dados['descricao']) > 255) {
         $erros[] = 'Descrição muito longa (máx. 255 caracteres).';
     }
 
     if (!$erros) {
         $stmt = $pdo->prepare(
-            'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, valor_pago, descricao)
-             VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :valor_pago, :descricao)'
+            'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, categoria_despesa, valor_pago, descricao)
+             VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :categoria_despesa, :valor_pago, :descricao)'
         );
         $stmt->execute([
-            ':veiculo_id'    => $veiculoId,
-            ':data'          => $dataRegistro->format('Y-m-d'),
-            ':km_atual'      => $kmAtual,
-            ':tipo_registro' => $tipoRegistro,
-            ':combustivel'   => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
-            ':litros'        => $tipoRegistro === 'Abastecimento' ? $litros : null,
-            ':valor_pago'    => $valorPago,
-            ':descricao'     => $dados['descricao'] !== '' ? $dados['descricao'] : null,
+            ':veiculo_id'        => $veiculoId,
+            ':data'              => $dataRegistro->format('Y-m-d'),
+            ':km_atual'          => $kmAtual,
+            ':tipo_registro'     => $tipoRegistro,
+            ':combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
+            ':litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
+            ':categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
+            ':valor_pago'        => $valorPago,
+            ':descricao'         => $dados['descricao'] !== '' ? $dados['descricao'] : null,
         ]);
 
         flashSet('sucesso', 'Registro salvo com sucesso.');
@@ -131,10 +139,13 @@ require __DIR__ . '/includes/header.php';
         <label class="form-label">Tipo de Registro</label>
         <div class="btn-group w-100" role="group">
             <input type="radio" class="btn-check" name="tipo_registro" id="tipoAbastecimento" value="Abastecimento" <?= $dados['tipo_registro'] === 'Abastecimento' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-primary btn-lg" for="tipoAbastecimento"><i class="bi bi-fuel-pump me-1"></i>Abastecimento</label>
+            <label class="btn btn-outline-primary" for="tipoAbastecimento"><i class="bi bi-fuel-pump me-1"></i>Abastecimento</label>
 
             <input type="radio" class="btn-check" name="tipo_registro" id="tipoManutencao" value="Manutencao" <?= $dados['tipo_registro'] === 'Manutencao' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-primary btn-lg" for="tipoManutencao"><i class="bi bi-tools me-1"></i>Manutenção</label>
+            <label class="btn btn-outline-primary" for="tipoManutencao"><i class="bi bi-tools me-1"></i>Manutenção</label>
+
+            <input type="radio" class="btn-check" name="tipo_registro" id="tipoDespesa" value="Despesa" <?= $dados['tipo_registro'] === 'Despesa' ? 'checked' : '' ?>>
+            <label class="btn btn-outline-primary" for="tipoDespesa"><i class="bi bi-receipt me-1"></i>Despesa</label>
         </div>
     </div>
 
@@ -148,7 +159,7 @@ require __DIR__ . '/includes/header.php';
         <input type="number" name="km_atual" class="form-control form-control-lg" min="0" inputmode="numeric" value="<?= h($dados['km_atual']) ?>" required>
     </div>
 
-    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] === 'Manutencao' ? 'd-none' : '' ?>">
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
         <label class="form-label">Combustível</label>
         <select name="combustivel" class="form-select form-select-lg">
             <option value="">Selecione...</option>
@@ -158,9 +169,19 @@ require __DIR__ . '/includes/header.php';
         </select>
     </div>
 
-    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] === 'Manutencao' ? 'd-none' : '' ?>">
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
         <label class="form-label">Litros Abastecidos</label>
         <input type="number" step="0.01" min="0.01" name="litros" class="form-control form-control-lg" inputmode="decimal" value="<?= h($dados['litros']) ?>">
+    </div>
+
+    <div class="mb-3 campo-despesa <?= $dados['tipo_registro'] !== 'Despesa' ? 'd-none' : '' ?>">
+        <label class="form-label">Categoria da Despesa</label>
+        <select name="categoria_despesa" class="form-select form-select-lg">
+            <option value="">Selecione...</option>
+            <?php foreach ($categoriasDespesaPermitidas as $c): ?>
+            <option value="<?= h($c) ?>" <?= $dados['categoria_despesa'] === $c ? 'selected' : '' ?>><?= h($c) ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
 
     <div class="mb-3">
