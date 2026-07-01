@@ -24,15 +24,19 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - Filtro de registros e relatórios por veículo
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
-- Identidade visual própria (paleta, logo, favicons) e manifest PWA (instalável na tela inicial)
+- Identidade visual própria (paleta, logo, favicons), com medidor (gauge) animado de consumo,
+  transições e micro-interações em toda a interface, e manifest PWA (instalável na tela inicial)
+- App Android nativo (TWA assinado) pra instalar via APK, além do PWA — página `/instalar.php`
+  com instruções pras duas formas
 - Interface mobile-first (Bootstrap 5 + Bootstrap Icons), navegação inferior fixa e botão flutuante (FAB) para novo registro
 
 ## Stack
 
-- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + Chart.js (CDN) + identidade visual própria (CSS) + manifest PWA
+- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + Chart.js (CDN) + identidade visual própria (CSS, com animações) + manifest PWA
 - **Backend:** PHP 8.2 puro (sem framework), Apache
 - **Banco:** MySQL 8.0, acesso exclusivo via PDO (prepared statements)
 - **E-mail:** cliente SMTP próprio em PHP puro (sem dependências), usado pro envio de convites
+- **App Android:** TWA (Trusted Web Activity) gerado com Bubblewrap, assinado com keystore próprio
 - **Infra:** Docker Compose (build próprio da imagem PHP+Apache hardenizada)
 
 ## Estrutura de pastas
@@ -127,6 +131,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.3.0  | 2026-06-30 | Redesign visual (cantos suaves, sombras com tom da marca, transições de toque/hover, entrada animada de página/listas, medidor (gauge) SVG animado com contagem progressiva do km/l, respeitando `prefers-reduced-motion`), app Android nativo (TWA assinado via Bubblewrap) com APK para download, Digital Asset Links (abre em tela cheia sem barra de URL) e página pública `/instalar.php` com instruções APK/PWA |
 | 1.2.0  | 2026-06-30 | Registro por convite (token único por e-mail, SMTP próprio sem dependências), conformidade LGPD (política de privacidade, consentimento, exclusão de conta), combustível no abastecimento (Gasolina Comum/Aditivada, Etanol, Diesel, GNV, Outro), preço por litro calculado, página de Relatórios com gráficos (gasto por mês, km rodado, evolução do consumo) e reorganização da navegação (dropdown de conta + bottom-nav com Relatórios) |
 | 1.1.0  | 2026-06-30 | Multi-usuário: cadastro/login/logout com lockout de tentativas, isolamento de dados por conta (correção de IDOR em exclusão/edição), edição de veículo e registro, identidade visual própria (logo, paleta, favicons) e manifest PWA |
 | 1.0.0  | 2026-06-30 | Versão inicial: CRUD de veículos/registros, cálculo de km/l, hardening completo, deploy em produção com Nginx + Let's Encrypt em pitstop.morenadoaco.com.br |
