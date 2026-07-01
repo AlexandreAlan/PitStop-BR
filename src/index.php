@@ -12,7 +12,23 @@ $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?:
 
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 
-$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.valor_pago, r.descricao, v.nome AS veiculo_nome
+$lembretesStmt = $pdo->prepare(
+    "SELECT l.descricao, l.tipo_alvo, l.km_alvo, l.data_alvo,
+            (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
+     FROM lembretes l
+     INNER JOIN veiculos v ON v.id = l.veiculo_id
+     WHERE v.usuario_id = :usuario_id AND l.concluido_em IS NULL"
+);
+$lembretesStmt->execute([':usuario_id' => $usuario['id']]);
+$lembretesAtencao = array_values(array_filter(
+    array_map(static function ($l) {
+        $status = calcularStatusLembrete($l)['status'];
+        return $status === 'ok' ? null : ['descricao' => $l['descricao'], 'status' => $status];
+    }, $lembretesStmt->fetchAll())
+));
+usort($lembretesAtencao, static fn($a, $b) => $a['status'] === 'vencido' ? -1 : ($b['status'] === 'vencido' ? 1 : 0));
+
+$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao, v.nome AS veiculo_nome
                   FROM registros r
                   INNER JOIN veiculos v ON v.id = r.veiculo_id
                   WHERE v.usuario_id = :usuario_id'
@@ -74,6 +90,19 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php if ($lembretesAtencao): ?>
+<a href="lembretes.php" class="alert <?= $lembretesAtencao[0]['status'] === 'vencido' ? 'alert-danger' : 'alert-warning' ?> py-2 px-3 d-flex align-items-center gap-2 mx-1 mb-3 text-decoration-none">
+    <i class="bi bi-bell-fill"></i>
+    <span class="small">
+        <?php if (count($lembretesAtencao) === 1): ?>
+            <strong><?= h($lembretesAtencao[0]['descricao']) ?></strong> <?= $lembretesAtencao[0]['status'] === 'vencido' ? 'está vencido' : 'está próximo do prazo' ?>.
+        <?php else: ?>
+            Você tem <strong><?= count($lembretesAtencao) ?> lembretes</strong> vencidos ou próximos do prazo.
+        <?php endif; ?>
+    </span>
+</a>
+<?php endif; ?>
+
 <?php if (count($veiculos) > 1): ?>
 <form method="get" class="px-1 mb-3" id="formFiltroVeiculo">
     <select name="veiculo_id" class="form-select" id="selectVeiculoFiltro">
@@ -111,13 +140,19 @@ require __DIR__ . '/includes/header.php';
             </a>
         </div>
     <?php else: ?>
-        <?php foreach ($registros as $r): ?>
+        <?php foreach ($registros as $r):
+            $badgeInfo = [
+                'Abastecimento' => ['bg-success', 'bi-fuel-pump', 'Abastecimento'],
+                'Manutencao'    => ['bg-warning text-dark', 'bi-tools', 'Manutenção'],
+                'Despesa'       => ['bg-info text-dark', 'bi-receipt', 'Despesa'],
+            ][$r['tipo_registro']];
+        ?>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2 px-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="registro-info">
-                        <span class="badge <?= $r['tipo_registro'] === 'Abastecimento' ? 'bg-success' : 'bg-warning text-dark' ?> mb-1">
-                            <i class="bi <?= $r['tipo_registro'] === 'Abastecimento' ? 'bi-fuel-pump' : 'bi-tools' ?> me-1"></i><?= h($r['tipo_registro'] === 'Abastecimento' ? 'Abastecimento' : 'Manutenção') ?>
+                        <span class="badge <?= $badgeInfo[0] ?> mb-1">
+                            <i class="bi <?= $badgeInfo[1] ?> me-1"></i><?= h($badgeInfo[2]) ?>
                         </span>
                         <div class="fw-semibold"><?= h($r['veiculo_nome']) ?></div>
                         <div class="text-muted small">
@@ -129,6 +164,9 @@ require __DIR__ . '/includes/header.php';
                             <?= h($r['combustivel']) ?>
                             <?php if ((float) $r['litros'] > 0): ?> · <?= h(formatarMoeda((float) $r['valor_pago'] / (float) $r['litros'])) ?>/L<?php endif; ?>
                         </div>
+                        <?php endif; ?>
+                        <?php if ($r['categoria_despesa']): ?>
+                        <div class="text-muted small"><?= h($r['categoria_despesa']) ?></div>
                         <?php endif; ?>
                         <?php if ($r['descricao']): ?><div class="text-muted small fst-italic"><?= h($r['descricao']) ?></div><?php endif; ?>
                     </div>
