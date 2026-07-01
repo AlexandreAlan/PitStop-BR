@@ -10,6 +10,18 @@ document.addEventListener('DOMContentLoaded', function () {
 function registrarServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
+    // Quando uma versão nova do Service Worker assume o controle (skipWaiting +
+    // clients.claim), a ABA JÁ ABERTA continua servida pela versão antiga até
+    // recarregar — sem isso, quem já estava com o app aberto (ou com uma versão
+    // travada de antes de uma correção) nunca via a correção sem fechar tudo à
+    // mão. Recarrega uma única vez (guarda contra loop) assim que troca de dono.
+    let recarregouPorAtualizacao = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (recarregouPorAtualizacao) return;
+        recarregouPorAtualizacao = true;
+        window.location.reload();
+    });
+
     navigator.serviceWorker.register('/sw.php').then(function (registro) {
         // O navegador só rechecka o sw.php sozinho a cada 24h — força a checagem
         // a cada carregamento de página, pra uma correção no Service Worker
