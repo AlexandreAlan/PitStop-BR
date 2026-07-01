@@ -26,50 +26,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['km_alvo']    = (string) ($_POST['km_alvo'] ?? '');
     $dados['data_alvo']  = (string) ($_POST['data_alvo'] ?? '');
 
-    $veiculoId = filter_var($dados['veiculo_id'], FILTER_VALIDATE_INT);
-    $tipoAlvo  = in_array($dados['tipo_alvo'], ['KM', 'Data'], true) ? $dados['tipo_alvo'] : null;
-    $kmAlvo    = $dados['km_alvo'] === '' ? null : filter_var($dados['km_alvo'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    $dataAlvo  = $dados['data_alvo'] === '' ? null : DateTime::createFromFormat('Y-m-d', $dados['data_alvo']);
-
-    if (!$veiculoId) {
-        $erros[] = 'Selecione um veículo válido.';
-    } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuario['id']]);
-        if (!$existe->fetchColumn()) {
-            $erros[] = 'Veículo não encontrado.';
-        }
-    }
-    if ($dados['descricao'] === '' || mb_strlen($dados['descricao']) > 150) {
-        $erros[] = 'Descrição inválida (máx. 150 caracteres).';
-    }
-    if (!$tipoAlvo) {
-        $erros[] = 'Selecione se o lembrete é por km ou por data.';
-    }
-    if ($tipoAlvo === 'KM' && !$kmAlvo) {
-        $erros[] = 'Informe o km alvo do lembrete.';
-    }
-    if ($tipoAlvo === 'Data' && (!$dataAlvo || $dataAlvo->format('Y-m-d') !== $dados['data_alvo'])) {
-        $erros[] = 'Informe uma data alvo válida.';
-    }
-
-    if (!$erros) {
-        $stmt = $pdo->prepare(
-            'INSERT INTO lembretes (veiculo_id, descricao, tipo_alvo, km_alvo, data_alvo)
-             VALUES (:veiculo_id, :descricao, :tipo_alvo, :km_alvo, :data_alvo)'
-        );
-        $stmt->execute([
-            ':veiculo_id' => $veiculoId,
-            ':descricao'  => $dados['descricao'],
-            ':tipo_alvo'  => $tipoAlvo,
-            ':km_alvo'    => $tipoAlvo === 'KM' ? $kmAlvo : null,
-            ':data_alvo'  => $tipoAlvo === 'Data' ? $dataAlvo->format('Y-m-d') : null,
-        ]);
-
+    $resultado = validarLembrete($pdo, $usuario['id'], $dados);
+    if ($resultado['ok']) {
+        inserirLembrete($pdo, $resultado['valores']);
         flashSet('sucesso', 'Lembrete criado com sucesso.');
         header('Location: lembretes.php');
         exit;
     }
+    $erros = $resultado['erros'];
 }
 
 $lembretesStmt = $pdo->prepare(
