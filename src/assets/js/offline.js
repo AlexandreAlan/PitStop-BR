@@ -11,6 +11,11 @@ function registrarServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
     navigator.serviceWorker.register('/sw.php').then(function (registro) {
+        // O navegador só rechecka o sw.php sozinho a cada 24h — força a checagem
+        // a cada carregamento de página, pra uma correção no Service Worker
+        // chegar pro usuário rápido em vez de ficar preso na versão antiga.
+        registro.update().catch(function () {});
+
         registro.addEventListener('updatefound', function () {
             const novoWorker = registro.installing;
             if (!novoWorker) return;
