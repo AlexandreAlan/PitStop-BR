@@ -1,5 +1,31 @@
 /* PitStop BR — identidade visual */
+
+@font-face {
+    font-family: 'Space Grotesk';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/space-grotesk-500.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Space Grotesk';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/space-grotesk-600.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Space Grotesk';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/space-grotesk-700.woff2') format('woff2');
+}
+
 :root {
+    --ps-font-display: 'Space Grotesk', system-ui, sans-serif;
     --ps-bg: #f4f6f9;
     --ps-ink: #13151a;
     --ps-dark: #1c1f26;
@@ -58,7 +84,17 @@
 .bg-success   { background-color: var(--ps-success) !important; }
 
 body {
-    background-color: var(--ps-bg);
+    background:
+        radial-gradient(1100px 480px at 50% 0%, rgba(var(--ps-primary-rgb), .07), transparent 65%),
+        var(--ps-bg);
+}
+
+.stat-valor,
+.valor-registro {
+    font-family: var(--ps-font-display);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
 }
 
 .brand-logo {
@@ -68,6 +104,7 @@ body {
 }
 
 .brand-wordmark {
+    font-family: var(--ps-font-display);
     font-weight: 700;
     letter-spacing: 0.01em;
 }
@@ -138,6 +175,115 @@ body {
     transform: scale(.92);
 }
 
+/* Reserva espaço pro FAB não tampar o conteúdo (valor/ações) dos cards da lista.
+   !important necessário pra vencer a utility .px-1 do Bootstrap, que também usa !important. */
+@media (max-width: 991.98px) {
+    .lista-registros {
+        padding-right: 4.75rem !important;
+    }
+}
+
+.registro-info {
+    min-width: 0;
+}
+
+.registro-valor-col {
+    flex-shrink: 0;
+    white-space: nowrap;
+    margin-left: .5rem;
+}
+
+@media (min-width: 992px) {
+    .fab {
+        display: none;
+    }
+}
+
+/* Estado vazio — convite à ação, não uma frase perdida no vazio */
+.estado-vazio {
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+}
+
+.estado-vazio-icone {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(var(--ps-primary-rgb), .1);
+    color: var(--ps-primary-dark);
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+}
+
+.estado-vazio-titulo {
+    font-family: var(--ps-font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin-bottom: .35rem;
+}
+
+.estado-vazio-texto {
+    color: #8a8f98;
+    font-size: .9rem;
+    max-width: 320px;
+    margin: 0 auto 1.25rem;
+}
+
+.estado-vazio-mini {
+    text-align: center;
+    color: #8a8f98;
+    font-size: .85rem;
+    padding: 1.75rem 1rem;
+    background: rgba(var(--ps-shadow-rgb), .025);
+    border-radius: var(--ps-radius-md);
+}
+
+.estado-vazio-mini i {
+    display: block;
+    font-size: 1.5rem;
+    margin-bottom: .5rem;
+    opacity: .6;
+}
+
+/* Odômetro — mostrador de dígitos, a assinatura visual do painel */
+.odometro {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    font-family: var(--ps-font-display);
+}
+
+.odometro-prefixo {
+    color: #8a8f98;
+    font-size: .8rem;
+    font-weight: 600;
+    margin-right: .15rem;
+}
+
+.odometro-digito {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.15rem;
+    padding: .1rem .05rem;
+    background: var(--ps-dark);
+    color: var(--ps-primary-light);
+    border-radius: .3rem;
+    font-weight: 600;
+    font-size: .95rem;
+    font-variant-numeric: tabular-nums;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35);
+}
+
+.odometro-separador {
+    color: #8a8f98;
+    font-weight: 700;
+    font-size: .8rem;
+}
+
 .lista-registros .card,
 .lista-veiculos .card {
     border: none;
@@ -198,6 +344,70 @@ body {
 
 body { padding-bottom: 76px; }
 
+/* Telas ≥992px: a barra de abas mobile vira uma sidebar compacta,
+   e o conteúdo ganha uma largura de leitura própria em vez de esticar
+   a coluna mobile no meio de um vazio cinza */
+@media (min-width: 992px) {
+    body { padding-bottom: 0; }
+
+    .app-shell {
+        display: flex;
+        align-items: flex-start;
+        gap: 2rem;
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 2rem 2rem 3rem;
+    }
+
+    main.container {
+        flex: 1 1 auto;
+        max-width: 720px;
+        margin: 0;
+        padding: 0;
+    }
+
+    .bottom-nav {
+        order: -1;
+        position: sticky;
+        top: 1.5rem;
+        flex: 0 0 216px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: .25rem;
+        background: #fff;
+        border-top: none;
+        border-radius: var(--ps-radius-lg);
+        box-shadow: 0 1px 3px rgba(var(--ps-shadow-rgb), .05), 0 8px 20px rgba(var(--ps-shadow-rgb), .06);
+        padding: .75rem;
+    }
+
+    .bottom-nav a {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: .75rem;
+        padding: .65rem .85rem;
+        font-size: .9rem;
+        border-radius: .7rem;
+        transition: background-color .15s var(--ps-ease), color .15s var(--ps-ease);
+    }
+
+    .bottom-nav a i {
+        font-size: 1.15rem;
+    }
+
+    .bottom-nav a:hover {
+        background: rgba(var(--ps-shadow-rgb), .04);
+    }
+
+    .bottom-nav a.ativo {
+        background: rgba(var(--ps-primary-rgb), .1);
+    }
+
+    .bottom-nav a.ativo i {
+        transform: none;
+    }
+}
+
 /* Telas de autenticação */
 .auth-wrap {
     min-height: 100vh;
@@ -211,6 +421,11 @@ body { padding-bottom: 76px; }
 .auth-card {
     width: 100%;
     max-width: 380px;
+}
+
+.auth-card h1 {
+    font-family: var(--ps-font-display);
+    font-weight: 600;
 }
 
 .auth-logo {
