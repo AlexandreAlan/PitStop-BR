@@ -38,6 +38,15 @@
     --bs-danger-rgb: 231, 76, 60;
 }
 
+/* O WebView do Android (usado pelo app instalado/TWA) tem um recurso de
+   "inflar o texto pra ficar legível" (font boosting) que aumenta a fonte
+   sozinho em colunas estreitas — sem isso, o app fica com letra/elementos
+   maiores dentro do app instalado do que numa aba comum do navegador. */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 .btn-primary {
     --bs-btn-bg: var(--ps-primary);
     --bs-btn-border-color: var(--ps-primary);
