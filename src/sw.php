@@ -17,13 +17,14 @@ importScripts('/assets/js/idb-outbox.js');
 const APP_VERSION = <?= $versaoJs ?>;
 const CACHE_NAME = 'pitstop-' + APP_VERSION;
 
+// IMPORTANTE: nenhuma página autenticada (index.php, adicionar.php, etc.) entra
+// aqui. O Service Worker registra em toda página, inclusive login.php ANTES do
+// usuário logar — se essas páginas estivessem na lista, o install pré-cachearia
+// a resposta redirecionada (login.php, HTTP 200 após seguir o redirect) com a
+// chave "/index.php" e o modo offline mostraria a tela de login pra sempre. As
+// páginas autenticadas são cacheadas sob demanda pelo handler de "navigate"
+// abaixo, só quando a resposta de rede não vier de um redirect de login.
 const PRECACHE_URLS = [
-    '/index.php',
-    '/adicionar.php',
-    '/relatorios.php',
-    '/veiculos.php',
-    '/lembretes.php',
-    '/conta.php',
     '/manifest.json',
     '/assets/css/brand.css',
     '/assets/js/index.js',
@@ -86,8 +87,15 @@ self.addEventListener('fetch', function (event) {
         event.respondWith(
             fetch(req)
                 .then(function (resp) {
-                    const copia = resp.clone();
-                    caches.open(CACHE_NAME).then(function (cache) { cache.put(req, copia); });
+                    // Sessão expirada/ausente: o servidor responde com um redirect pra
+                    // login.php que o fetch já segue (vira HTTP 200 normal). Guardar essa
+                    // tela de login sob a chave da página original é o bug que fazia o
+                    // modo offline mostrar login em vez dos dados reais — nunca cacheia.
+                    const eRedirectDeLogin = resp.redirected && new URL(resp.url).pathname.endsWith('/login.php');
+                    if (!eRedirectDeLogin) {
+                        const copia = resp.clone();
+                        caches.open(CACHE_NAME).then(function (cache) { cache.put(req, copia); });
+                    }
                     return resp;
                 })
                 .catch(function () {
