@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/css/brand.css">
 </head>
-<body>
+<body<?= empty($telaAuth) ? ' class="tem-bottom-nav"' : '' ?>>
 
 <?php $usuarioLogado = usuarioAtual(); ?>
 <?php if (!empty($telaAuth)): ?>
