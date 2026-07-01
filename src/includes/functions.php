@@ -27,6 +27,23 @@ function formatarMoeda(float $valor): string
 }
 
 /**
+ * Renderiza um valor monetário como um mostrador estilo odômetro/bomba de combustível,
+ * com cada dígito em uma "ficha" própria — o elemento de assinatura visual do painel.
+ */
+function renderOdometro(float $valor, string $rotulo): string
+{
+    $numero = number_format($valor, 2, ',', '.');
+    $html = '<span class="odometro" role="img" aria-label="' . h($rotulo . ': ' . formatarMoeda($valor)) . '">';
+    $html .= '<span class="odometro-prefixo" aria-hidden="true">R$</span>';
+    foreach (mb_str_split($numero) as $char) {
+        $classe = ctype_digit($char) ? 'odometro-digito' : 'odometro-separador';
+        $html .= '<span class="' . $classe . '" aria-hidden="true">' . h($char) . '</span>';
+    }
+    $html .= '</span>';
+    return $html;
+}
+
+/**
  * KM/L calculado a partir dos dois últimos abastecimentos (por KM), não por data.
  * Sempre restrito aos veículos do usuário informado.
  */
