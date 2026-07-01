@@ -52,7 +52,11 @@ require __DIR__ . '/includes/header.php';
 <div class="lista-veiculos px-1 mb-4">
     <h6 class="text-muted mb-2 px-1">Meus Veículos</h6>
     <?php if (!$veiculos): ?>
-        <p class="text-center text-muted small py-3">Nenhum veículo cadastrado.</p>
+        <div class="estado-vazio">
+            <i class="bi bi-car-front estado-vazio-icone" aria-hidden="true"></i>
+            <p class="estado-vazio-titulo">Nenhum veículo cadastrado</p>
+            <p class="estado-vazio-texto">Cadastre seu primeiro veículo no formulário abaixo pra começar a registrar abastecimentos e manutenções.</p>
+        </div>
     <?php else: ?>
         <?php foreach ($veiculos as $v): ?>
         <div class="card shadow-sm mb-2">
