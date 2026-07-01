@@ -24,11 +24,15 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - Filtro de registros e relatórios por veículo
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
-- Identidade visual própria (paleta, logo, favicons), com medidor (gauge) animado de consumo,
-  transições e micro-interações em toda a interface, e manifest PWA (instalável na tela inicial)
+- Identidade visual própria (paleta, logo, favicons, tipografia de exibição Space Grotesk
+  auto-hospedada), com medidor (gauge) animado de consumo, mostrador estilo odômetro pro gasto do
+  mês, transições e micro-interações em toda a interface, e manifest PWA (instalável na tela inicial)
 - App Android nativo (TWA assinado) pra instalar via APK, além do PWA — página `/instalar.php`
   com instruções pras duas formas
-- Interface mobile-first (Bootstrap 5 + Bootstrap Icons), navegação inferior fixa e botão flutuante (FAB) para novo registro
+- Interface mobile-first (Bootstrap 5 + Bootstrap Icons) com navegação inferior fixa e botão
+  flutuante (FAB) para novo registro; em telas ≥992px a navegação vira uma sidebar compacta e as
+  páginas ganham layout de painel (ex.: gráficos em grade de 2 colunas nos Relatórios)
+- Estados vazios com ícone, texto e chamada para ação em vez de mensagens soltas
 
 ## Stack
 
@@ -131,6 +135,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.4.0  | 2026-07-01 | Correção de bug real (FAB tampando o valor dos registros na lista ao rolar a tela), tipografia de exibição própria (Space Grotesk, auto-hospedada), mostrador estilo odômetro pro gasto do mês, estados vazios com ícone/texto/CTA, sidebar de navegação compacta e grade de 2 colunas nos gráficos para telas ≥992px, barras dos gráficos com largura proporcional e emojis trocados por ícones Bootstrap Icons na página de instalação |
 | 1.3.0  | 2026-06-30 | Redesign visual (cantos suaves, sombras com tom da marca, transições de toque/hover, entrada animada de página/listas, medidor (gauge) SVG animado com contagem progressiva do km/l, respeitando `prefers-reduced-motion`), app Android nativo (TWA assinado via Bubblewrap) com APK para download, Digital Asset Links (abre em tela cheia sem barra de URL) e página pública `/instalar.php` com instruções APK/PWA |
 | 1.2.0  | 2026-06-30 | Registro por convite (token único por e-mail, SMTP próprio sem dependências), conformidade LGPD (política de privacidade, consentimento, exclusão de conta), combustível no abastecimento (Gasolina Comum/Aditivada, Etanol, Diesel, GNV, Outro), preço por litro calculado, página de Relatórios com gráficos (gasto por mês, km rodado, evolução do consumo) e reorganização da navegação (dropdown de conta + bottom-nav com Relatórios) |
 | 1.1.0  | 2026-06-30 | Multi-usuário: cadastro/login/logout com lockout de tentativas, isolamento de dados por conta (correção de IDOR em exclusão/edição), edição de veículo e registro, identidade visual própria (logo, paleta, favicons) e manifest PWA |
