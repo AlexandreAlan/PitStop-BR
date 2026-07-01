@@ -54,5 +54,6 @@
 <?php endif; ?>
 
 <?php if (empty($telaAuth)): ?>
+<div class="app-shell">
 <main class="container">
 <?php endif; ?>
