@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.6.8';
+const APP_VERSION = '1.6.9';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.6.9',
+        'resumo'  => 'Removido o layout diferente de "computador" (menu lateral, colunas largas) que aparecia ao abrir no notebook/PC — agora fica exatamente igual ao celular em qualquer tamanho de tela, só centralizado.',
+    ],
     [
         'versao'  => '1.6.8',
         'resumo'  => 'Correção do offline logo depois de instalar o app do zero: o cache de páginas só era recarregado na instalação (quando ainda não tinha login) ou numa atualização de versão — se você instalasse o app, logasse e fosse direto pro modo offline sem visitar cada tela na mão antes, ficava faltando página. Agora ele recarrega sozinho assim que percebe que você logou.',
