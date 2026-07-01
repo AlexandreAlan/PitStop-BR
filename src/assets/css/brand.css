@@ -339,10 +339,24 @@ body {
 
 body.tem-bottom-nav { padding-bottom: 86px; }
 
-/* Telas ≥992px: a barra de abas mobile vira uma sidebar compacta,
-   e o conteúdo ganha uma largura de leitura própria em vez de esticar
-   a coluna mobile no meio de um vazio cinza */
-@media (min-width: 992px) {
+/* Trava a largura do container em qualquer dispositivo touch (celular),
+   mesmo que o viewport seja mal-calculado pelo WebView (ver nota acima do
+   breakpoint desktop) — nunca deixa o Bootstrap aplicar os max-width fixos
+   dos próprios breakpoints (540/720/960px) fora do modo desktop com mouse. */
+@media not all and (pointer: fine) {
+    main.container {
+        max-width: 100%;
+    }
+}
+
+/* Telas ≥992px COM mouse (pointer: fine): a barra de abas mobile vira uma
+   sidebar compacta, e o conteúdo ganha uma largura de leitura própria em
+   vez de esticar a coluna mobile no meio de um vazio cinza.
+   O "pointer: fine" é essencial: alguns WebViews (app instalado/TWA no
+   Android) relatam a largura de viewport errada pro CSS, disparando esse
+   breakpoint "desktop" sozinho num celular — travar por tipo de ponteiro
+   evita isso, já que touch é sempre "coarse", nunca "fine". */
+@media (min-width: 992px) and (pointer: fine) {
     body.tem-bottom-nav { padding-bottom: 0; }
 
     .app-shell {
