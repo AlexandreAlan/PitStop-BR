@@ -11,9 +11,15 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 ## Funcionalidades
 
 - Multi-usuário: cada conta só enxerga e mexe nos próprios veículos/registros
-- Registro só por convite: primeira conta criada via cadastro aberto; depois disso, só entra quem
-  recebe um convite por e-mail (link com token de uso único e validade de 7 dias) de alguém que já
-  usa o app
+- Cadastro aberto com confirmação de e-mail (código de 6 dígitos, válido por 15 min, com limite de
+  tentativas e reenvio), rate limit de 5 cadastros por hora por IP; também dá pra entrar por
+  convite de quem já usa o app (link com token de uso único e validade de 7 dias, e-mail
+  considerado confirmado automaticamente nesse caso)
+- Painel Administrativo (conta com papel "admin"): visão agregada de todas as contas — veículos,
+  registros e total gasto por conta — sem acessar o detalhe de nenhum registro individual
+- Funciona sem internet: Service Worker + fila offline (IndexedDB) guardam o que você registra sem
+  sinal e sincronizam sozinhos assim que a conexão volta (inclusive em segundo plano, via
+  Background Sync); aviso de "o que mudou" nas primeiras aberturas depois de uma atualização
 - Login com bloqueio temporário após tentativas falhas
 - Cadastro, edição e exclusão de veículos (nome + tipo: Moto/Carro/Outro)
 - Registro, edição e exclusão de abastecimentos (km, litros, valor pago, combustível: Gasolina
@@ -41,7 +47,7 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 
 ## Stack
 
-- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + Chart.js (CDN) + identidade visual própria (CSS, com animações) + manifest PWA
+- **Frontend:** HTML5 + Bootstrap 5 (CDN) + Bootstrap Icons + Chart.js (CDN) + identidade visual própria (CSS, com animações) + manifest PWA + Service Worker/IndexedDB (modo offline)
 - **Backend:** PHP 8.2 puro (sem framework), Apache
 - **Banco:** MySQL 8.0, acesso exclusivo via PDO (prepared statements)
 - **E-mail:** cliente SMTP próprio em PHP puro (sem dependências), usado pro envio de convites
@@ -61,23 +67,32 @@ pitstop-br/
 │   ├── php.ini             # hardening PHP (expose_php off, sessão segura, sem upload...)
 │   └── security.conf       # hardening Apache (headers, sem listagem de diretório)
 └── src/
+    ├── api/
+    │   ├── registro.php    # POST idempotente (client_uuid) usado pela fila offline
+    │   ├── lembrete.php    # POST idempotente (client_uuid) usado pela fila offline
+    │   └── versao.php      # versão + changelog em JSON (aviso de atualização)
     ├── assets/
     │   ├── css/brand.css   # identidade visual (paleta, header, bottom-nav, telas de auth)
     │   ├── img/            # logo, favicons e ícones PWA
-    │   └── js/              # confirm() de exclusão e toggles de formulário (CSP-friendly)
+    │   └── js/
+    │       ├── offline.js       # registra o SW, intercepta formulários sem sinal, aviso de atualização
+    │       └── idb-outbox.js    # fila offline (IndexedDB), compartilhada com o Service Worker
     ├── config/
-    │   ├── bootstrap.php   # sessão segura + carrega conexão/CSRF/auth/funções
+    │   ├── bootstrap.php   # sessão segura (30 dias, PWA) + carrega conexão/CSRF/auth/funções/versão
     │   ├── conexao.php     # PDO (lê credenciais do ambiente)
     │   ├── csrf.php        # geração/validação de token CSRF
-    │   ├── auth.php        # login/registro/logout/guard, hash de senha, lockout de tentativas
-    │   └── mailer.php      # cliente SMTP mínimo (sem dependências) pro envio de convites
+    │   ├── auth.php        # login/registro/logout/guard, papel admin, verificação de e-mail, lockout
+    │   ├── versao.php      # versão do app + changelog (rodapé e aviso de atualização)
+    │   └── mailer.php      # cliente SMTP mínimo (sem dependências) pro envio de convites/códigos
     ├── includes/
-    │   ├── functions.php   # helpers (escape, flash, cálculo de consumo)
+    │   ├── functions.php   # helpers (escape, flash, cálculo de consumo, validação de registro/lembrete)
     │   ├── header.php
     │   └── footer.php
     ├── manifest.json       # manifest PWA (instalável na tela inicial)
-    ├── login.php / cadastro.php / logout.php   # autenticação
+    ├── sw.php              # Service Worker (cache com versionamento, fallback offline, Background Sync)
+    ├── login.php / cadastro.php / verificar_email.php / logout.php   # autenticação + confirmação de e-mail
     ├── convidar.php / convite.php              # envio e aceite de convite (registro por convite)
+    ├── gerenciador.php     # painel administrativo (dados agregados por conta; só para papel admin)
     ├── conta.php / privacidade.php             # minha conta (exclusão de dados) e política LGPD
     ├── index.php           # dashboard (última média, gastos do mês, alerta de lembretes, registros)
     ├── relatorios.php      # gráficos de gasto, km rodado e consumo; filtro por período; export CSV/PDF
@@ -97,6 +112,15 @@ pitstop-br/
   após login/cadastro
 - Isolamento multi-usuário: toda consulta/gravação de veículo e registro é restrita por
   `usuario_id` (via FK + `JOIN`/`WHERE`), prevenindo IDOR entre contas
+- Confirmação de e-mail: código de 6 dígitos, armazenado só como hash SHA-256 (nunca em texto
+  plano), validade de 15 min, limite de tentativas e rate limit de reenvio; sem essa confirmação
+  a conta não consegue logar
+- Rate limit de cadastro (5 por hora por IP, hash do IP no banco) contra automação de contas em massa
+- Papel admin: página administrativa responde 404 (não 403) pra quem não é admin, evitando revelar
+  que a rota existe; painel mostra só dados agregados por conta, nunca o detalhe de um registro
+- API offline (`api/registro.php`, `api/lembrete.php`) reusa a mesma validação e o mesmo escopo por
+  `usuario_id` dos formulários clássicos; inserções são idempotentes por `client_uuid` (`UNIQUE`),
+  então reenviar o mesmo item da fila offline nunca duplica dados
 - Convites: token de 32 bytes aleatórios, armazenado só como hash SHA-256 no banco (nunca em
   texto plano), expira em 7 dias, uso único garantido por lock transacional (`SELECT ... FOR
   UPDATE`)
@@ -141,6 +165,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.6.0  | 2026-07-01 | Modo offline completo (Service Worker + fila IndexedDB com sincronização automática/Background Sync, API idempotente por `client_uuid`), reabertura do cadastro público com confirmação de e-mail por código de 6 dígitos (rate limit por IP), Painel Administrativo com dados agregados por conta (papel admin) e aviso de atualização com changelog simplificado nas primeiras aberturas após uma nova versão |
 | 1.5.0  | 2026-07-01 | Categoria "Despesa" no registro (Seguro, IPVA, Estacionamento, Pedágio, Multa, Lavagem, Outro), lembretes de manutenção/documentos por km ou por data com alerta no painel principal, filtro de relatórios por período (data início/fim) e exportação em CSV ou PDF (impressão do navegador) |
 | 1.4.0  | 2026-07-01 | Redesign visual com base em pesquisa de apps reais da categoria (Drivvo): correção definitiva do bug do botão de novo registro sobrepondo valores da lista (agora embutido na barra de navegação, não mais flutuante), paleta com duas cores (laranja + teal) e selos de ícone nas estatísticas, estados vazios com ícone/texto/CTA, sidebar de navegação compacta e grade de 2 colunas nos gráficos para telas ≥992px, barras dos gráficos com largura proporcional e emojis trocados por ícones Bootstrap Icons na página de instalação |
 | 1.3.0  | 2026-06-30 | Redesign visual (cantos suaves, sombras com tom da marca, transições de toque/hover, entrada animada de página/listas, medidor (gauge) SVG animado com contagem progressiva do km/l, respeitando `prefers-reduced-motion`), app Android nativo (TWA assinado via Bubblewrap) com APK para download, Digital Asset Links (abre em tela cheia sem barra de URL) e página pública `/instalar.php` com instruções APK/PWA |
