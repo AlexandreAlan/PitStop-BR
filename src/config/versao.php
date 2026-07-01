@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.6.4';
+const APP_VERSION = '1.6.5';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.6.5',
+        'resumo'  => 'Correção definitiva do layout "de computador" no celular: a tentativa anterior (1.6.2) travava por "tem mouse de verdade?", mas em alguns aparelhos com caneta (S Pen, por exemplo) essa checagem dava falso positivo mesmo usando só o dedo. Agora a checagem é se a tela realmente tem toque — essa é a que nunca falha.',
+    ],
     [
         'versao'  => '1.6.4',
         'resumo'  => 'Correção séria do modo offline: em alguns casos o app guardava a tela de login no lugar dos seus dados, fazendo parecer que o app "não funcionava" sem internet. Essa versão limpa o cache antigo automaticamente — feche e abra o app uma vez pra garantir.',
