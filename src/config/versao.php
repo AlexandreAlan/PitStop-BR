@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.6.4';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.6.4',
+        'resumo'  => 'Correção séria do modo offline: em alguns casos o app guardava a tela de login no lugar dos seus dados, fazendo parecer que o app "não funcionava" sem internet. Essa versão limpa o cache antigo automaticamente — feche e abra o app uma vez pra garantir.',
+    ],
     [
         'versao'  => '1.6.3',
         'resumo'  => 'A partir de agora, quando sai uma correção, o app recarrega sozinho pra aplicá-la — sem precisar fechar e abrir na mão. Se você chegou a ver telas fora do padrão nas versões anteriores, feche e abra o app mais uma vez pra garantir que essa correção específica seja carregada.',
