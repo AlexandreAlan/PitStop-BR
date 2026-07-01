@@ -14,6 +14,9 @@
     <a href="relatorios.php" class="<?= $paginaAtual === 'relatorios.php' ? 'ativo' : '' ?>">
         <i class="bi bi-bar-chart-fill"></i>Relatórios
     </a>
+    <a href="adicionar.php" class="nav-fab" aria-label="Novo Registro">
+        <i class="bi bi-plus-lg"></i>
+    </a>
     <a href="veiculos.php" class="<?= $paginaAtual === 'veiculos.php' ? 'ativo' : '' ?>">
         <i class="bi bi-car-front-fill"></i>Veículos
     </a>
