@@ -20,6 +20,9 @@
     <a href="veiculos.php" class="<?= $paginaAtual === 'veiculos.php' ? 'ativo' : '' ?>">
         <i class="bi bi-car-front-fill"></i>Veículos
     </a>
+    <a href="lembretes.php" class="<?= $paginaAtual === 'lembretes.php' ? 'ativo' : '' ?>">
+        <i class="bi bi-bell-fill"></i>Lembretes
+    </a>
 </nav>
 <?php endif; ?>
 </div><!-- .app-shell -->
