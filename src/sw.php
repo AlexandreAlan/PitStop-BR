@@ -63,6 +63,14 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
     const req = event.request;
 
+    // Peculiaridade do Chromium: requisições especulativas de recursos cross-origin
+    // (CDN) às vezes chegam com cache "only-if-cached" fora do modo "same-origin" —
+    // um fetch(req) direto nesse combo lança TypeError e derruba a página inteira
+    // (perde CSS/JS do Bootstrap). Deixa essas passarem direto, sem o SW mexer.
+    if (req.cache === 'only-if-cached' && req.mode !== 'same-origin') {
+        return;
+    }
+
     // POST/PUT/DELETE (formulários e APIs de escrita): sempre direto pra rede.
     // A fila offline é responsabilidade do offline.js, não do cache do SW.
     if (req.method !== 'GET') {
