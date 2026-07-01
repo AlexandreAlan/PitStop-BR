@@ -12,7 +12,10 @@ document.addEventListener('DOMContentLoaded', function () {
             type: 'bar',
             data: {
                 labels: dados.gastoMes.labels,
-                datasets: [{ label: 'Gasto (R$)', data: dados.gastoMes.valores, backgroundColor: corPrimaria }]
+                datasets: [{
+                    label: 'Gasto (R$)', data: dados.gastoMes.valores, backgroundColor: corPrimaria,
+                    borderRadius: 6, barPercentage: 0.5, categoryPercentage: 0.6, maxBarThickness: 56,
+                }]
             },
             options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
@@ -24,7 +27,10 @@ document.addEventListener('DOMContentLoaded', function () {
             type: 'bar',
             data: {
                 labels: dados.kmMes.labels,
-                datasets: [{ label: 'Km rodado', data: dados.kmMes.valores, backgroundColor: '#1c1f26' }]
+                datasets: [{
+                    label: 'Km rodado', data: dados.kmMes.valores, backgroundColor: '#1c1f26',
+                    borderRadius: 6, barPercentage: 0.5, categoryPercentage: 0.6, maxBarThickness: 56,
+                }]
             },
             options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });

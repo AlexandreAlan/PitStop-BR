@@ -133,7 +133,7 @@ require __DIR__ . '/includes/header.php';
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <p class="text-muted small mb-1">Total Gasto</p>
-                <p class="fw-bold mb-0 small"><?= h(formatarMoeda($totalGasto)) ?></p>
+                <p class="fw-bold mb-0 small stat-valor"><?= h(formatarMoeda($totalGasto)) ?></p>
             </div>
         </div>
     </div>
@@ -141,7 +141,7 @@ require __DIR__ . '/includes/header.php';
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <p class="text-muted small mb-1">Gasto Médio/Dia</p>
-                <p class="fw-bold mb-0 small"><?= $gastoMedioDia !== null ? h(formatarMoeda($gastoMedioDia)) : '—' ?></p>
+                <p class="fw-bold mb-0 small stat-valor"><?= $gastoMedioDia !== null ? h(formatarMoeda($gastoMedioDia)) : '—' ?></p>
             </div>
         </div>
     </div>
@@ -149,34 +149,36 @@ require __DIR__ . '/includes/header.php';
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <p class="text-muted small mb-1">Preço Médio/L</p>
-                <p class="fw-bold mb-0 small"><?= $precoMedioLitro !== null ? h(formatarMoeda($precoMedioLitro)) : '—' ?></p>
+                <p class="fw-bold mb-0 small stat-valor"><?= $precoMedioLitro !== null ? h(formatarMoeda($precoMedioLitro)) : '—' ?></p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="px-1 mb-4">
-    <h6 class="text-muted mb-2">Gasto por Mês</h6>
-    <?php if (!$gastoPorMes): ?>
-        <p class="text-center text-muted small py-3">Sem dados suficientes ainda.</p>
-    <?php else: ?>
-        <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoGastoMes" height="180"></canvas></div></div>
-    <?php endif; ?>
-</div>
+<div class="row">
+    <div class="col-lg-6 px-1 mb-4">
+        <h6 class="text-muted mb-2">Gasto por Mês</h6>
+        <?php if (!$gastoPorMes): ?>
+            <div class="estado-vazio-mini"><i class="bi bi-bar-chart" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
+        <?php else: ?>
+            <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoGastoMes" height="180"></canvas></div></div>
+        <?php endif; ?>
+    </div>
 
-<div class="px-1 mb-4">
-    <h6 class="text-muted mb-2">Km Rodado por Mês</h6>
-    <?php if (!$kmPorMes): ?>
-        <p class="text-center text-muted small py-3">Sem dados suficientes ainda.</p>
-    <?php else: ?>
-        <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoKmMes" height="180"></canvas></div></div>
-    <?php endif; ?>
+    <div class="col-lg-6 px-1 mb-4">
+        <h6 class="text-muted mb-2">Km Rodado por Mês</h6>
+        <?php if (!$kmPorMes): ?>
+            <div class="estado-vazio-mini"><i class="bi bi-signpost-split" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
+        <?php else: ?>
+            <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoKmMes" height="180"></canvas></div></div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <div class="px-1 mb-4">
     <h6 class="text-muted mb-2">Evolução do Consumo (km/l)</h6>
     <?php if (!$consumo): ?>
-        <p class="text-center text-muted small py-3">Precisa de pelo menos 2 abastecimentos do mesmo veículo.</p>
+        <div class="estado-vazio-mini"><i class="bi bi-graph-up" aria-hidden="true"></i>Precisa de pelo menos 2 abastecimentos do mesmo veículo.</div>
     <?php else: ?>
         <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoConsumo" height="180"></canvas></div></div>
     <?php endif; ?>
