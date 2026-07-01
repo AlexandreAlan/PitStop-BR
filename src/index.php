@@ -64,7 +64,8 @@ require __DIR__ . '/includes/header.php';
         <?php else: ?>
         <h2 class="display-6 fw-bold text-success mb-0"><i class="bi bi-speedometer2 me-1"></i>Sem dados</h2>
         <?php endif; ?>
-        <p class="text-muted small mt-2 mb-0">Gasto este mês: <strong><?= h(formatarMoeda($gastoMes)) ?></strong></p>
+        <p class="text-muted small mb-1 mt-2">Gasto este mês</p>
+        <?= renderOdometro($gastoMes, 'Gasto este mês') ?>
     </div>
 </div>
 
@@ -84,16 +85,32 @@ require __DIR__ . '/includes/header.php';
 <div class="lista-registros px-1">
     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
         <h6 class="text-muted mb-0">Registros Recentes</h6>
+        <?php if ($veiculos): ?>
+        <a href="adicionar.php" class="btn btn-primary btn-sm d-none d-lg-inline-flex align-items-center gap-1">
+            <i class="bi bi-plus-lg"></i>Novo Registro
+        </a>
+        <?php endif; ?>
     </div>
 
     <?php if (!$registros): ?>
-        <p class="text-center text-muted small py-4">Nenhum registro cadastrado ainda.</p>
+        <div class="estado-vazio">
+            <i class="bi bi-fuel-pump estado-vazio-icone" aria-hidden="true"></i>
+            <p class="estado-vazio-titulo">Nenhum registro ainda</p>
+            <p class="estado-vazio-texto">
+                <?= $veiculos
+                    ? 'Adicione seu primeiro abastecimento ou manutenção pra começar a acompanhar consumo e gasto.'
+                    : 'Cadastre um veículo primeiro pra começar a registrar abastecimentos.' ?>
+            </p>
+            <a href="<?= $veiculos ? 'adicionar.php' : 'veiculos.php' ?>" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i><?= $veiculos ? 'Novo Registro' : 'Cadastrar Veículo' ?>
+            </a>
+        </div>
     <?php else: ?>
         <?php foreach ($registros as $r): ?>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2 px-3">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
+                    <div class="registro-info">
                         <span class="badge <?= $r['tipo_registro'] === 'Abastecimento' ? 'bg-success' : 'bg-warning text-dark' ?> mb-1">
                             <i class="bi <?= $r['tipo_registro'] === 'Abastecimento' ? 'bi-fuel-pump' : 'bi-tools' ?> me-1"></i><?= h($r['tipo_registro'] === 'Abastecimento' ? 'Abastecimento' : 'Manutenção') ?>
                         </span>
@@ -110,8 +127,8 @@ require __DIR__ . '/includes/header.php';
                         <?php endif; ?>
                         <?php if ($r['descricao']): ?><div class="text-muted small fst-italic"><?= h($r['descricao']) ?></div><?php endif; ?>
                     </div>
-                    <div class="text-end">
-                        <div class="fw-bold mb-1"><?= h(formatarMoeda((float) $r['valor_pago'])) ?></div>
+                    <div class="text-end registro-valor-col">
+                        <div class="fw-bold mb-1 valor-registro"><?= h(formatarMoeda((float) $r['valor_pago'])) ?></div>
                         <a href="registro_editar.php?id=<?= (int) $r['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1">
                             <i class="bi bi-pencil"></i>
                         </a>
