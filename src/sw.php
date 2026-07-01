@@ -17,13 +17,7 @@ importScripts('/assets/js/idb-outbox.js');
 const APP_VERSION = <?= $versaoJs ?>;
 const CACHE_NAME = 'pitstop-' + APP_VERSION;
 
-// IMPORTANTE: nenhuma página autenticada (index.php, adicionar.php, etc.) entra
-// aqui. O Service Worker registra em toda página, inclusive login.php ANTES do
-// usuário logar — se essas páginas estivessem na lista, o install pré-cachearia
-// a resposta redirecionada (login.php, HTTP 200 após seguir o redirect) com a
-// chave "/index.php" e o modo offline mostraria a tela de login pra sempre. As
-// páginas autenticadas são cacheadas sob demanda pelo handler de "navigate"
-// abaixo, só quando a resposta de rede não vier de um redirect de login.
+// Assets estáticos: sempre seguros de pré-cachear (não dependem de sessão).
 const PRECACHE_URLS = [
     '/manifest.json',
     '/assets/css/brand.css',
@@ -41,10 +35,46 @@ const PRECACHE_URLS = [
     '/assets/img/logo-mark.svg',
 ];
 
+// Páginas autenticadas: NÃO entram no cache.addAll acima de propósito. O
+// Service Worker registra em toda página, inclusive login.php ANTES do
+// usuário logar — se essas URLs fossem cacheadas incondicionalmente, o
+// install pré-cachearia a resposta redirecionada (login.php, HTTP 200 após
+// seguir o redirect) com a chave "/index.php", e o modo offline mostraria a
+// tela de login pra sempre (bug corrigido na v1.6.4). Em vez disso, cada uma
+// é buscada individualmente com a sessão atual: se vier autenticada de
+// verdade (sem redirect pra login), entra no cache; senão, é ignorada sem
+// derrubar o install inteiro. Isso faz uma atualização de versão (que apaga
+// o cache antigo) já deixar o modo offline funcionando de novo na hora,
+// contanto que o usuário já esteja logado — sem precisar visitar página por
+// página com internet antes de poder confiar no offline.
+const PAGINAS_AUTENTICADAS = [
+    '/index.php',
+    '/adicionar.php',
+    '/relatorios.php',
+    '/veiculos.php',
+    '/lembretes.php',
+    '/conta.php',
+];
+
 self.addEventListener('install', function (event) {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(function (cache) { return cache.addAll(PRECACHE_URLS); })
+            .then(function (cache) {
+                return cache.addAll(PRECACHE_URLS).then(function () {
+                    return Promise.all(PAGINAS_AUTENTICADAS.map(function (url) {
+                        return fetch(url, { credentials: 'same-origin' }).then(function (resp) {
+                            const eRedirectDeLogin = resp.redirected && new URL(resp.url).pathname.endsWith('/login.php');
+                            if (resp.ok && !eRedirectDeLogin) {
+                                return cache.put(url, resp);
+                            }
+                        }).catch(function () {
+                            // Sem rede no momento do install: sem problema, essa página
+                            // fica pra ser cacheada na próxima visita online (handler de
+                            // "navigate" abaixo já faz isso sozinho).
+                        });
+                    }));
+                });
+            })
             .then(function () { return self.skipWaiting(); })
     );
 });
@@ -101,7 +131,26 @@ self.addEventListener('fetch', function (event) {
                 })
                 .catch(function () {
                     return caches.match(req).then(function (cached) {
-                        return cached || caches.match('/index.php');
+                        if (cached) return cached;
+                        return caches.match('/index.php').then(function (shell) {
+                            if (shell) return shell;
+                            // Nem essa página nem o painel principal foram salvos ainda
+                            // (ex.: logo após atualizar a versão, sem sessão pra
+                            // pré-cachear). Sem isso, o navegador mostra a tela de erro
+                            // genérica dele — essa aqui pelo menos explica o motivo.
+                            return new Response(
+                                '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+                                '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+                                '<title>Sem conexão — PitStop BR</title></head>' +
+                                '<body style="font-family:sans-serif;background:#1c1f26;color:#fff;' +
+                                'display:flex;align-items:center;justify-content:center;min-height:100vh;' +
+                                'margin:0;text-align:center;padding:2rem;">' +
+                                '<div><p style="font-size:1.1rem;">Sem conexão, e essa página ainda não ' +
+                                'foi salva no aparelho.</p><p style="opacity:.7;font-size:.9rem;">Abra ela ' +
+                                'uma vez com internet pra poder usar offline depois.</p></div></body></html>',
+                                { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                            );
+                        });
                     });
                 })
         );
