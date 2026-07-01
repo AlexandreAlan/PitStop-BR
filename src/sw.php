@@ -56,27 +56,43 @@ const PAGINAS_AUTENTICADAS = [
     '/conta.php',
 ];
 
+function recachearPaginasAutenticadas() {
+    return caches.open(CACHE_NAME).then(function (cache) {
+        return Promise.all(PAGINAS_AUTENTICADAS.map(function (url) {
+            return fetch(url, { credentials: 'same-origin' }).then(function (resp) {
+                const eRedirectDeLogin = resp.redirected && new URL(resp.url).pathname.endsWith('/login.php');
+                if (resp.ok && !eRedirectDeLogin) {
+                    return cache.put(url, resp);
+                }
+            }).catch(function () {
+                // Sem rede agora: sem problema, essa página fica pra ser cacheada na
+                // próxima visita online (handler de "navigate" abaixo já faz isso sozinho).
+            });
+        }));
+    });
+}
+
 self.addEventListener('install', function (event) {
+    // Instalação inicial: se ainda não tem sessão (ex.: SW registrando na
+    // própria tela de login, ANTES do primeiro login), essas buscas vêm
+    // redirecionadas e são ignoradas — nesse caso é a mensagem abaixo (disparada
+    // pela página logo após o login) que efetivamente preenche o cache.
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(function (cache) {
-                return cache.addAll(PRECACHE_URLS).then(function () {
-                    return Promise.all(PAGINAS_AUTENTICADAS.map(function (url) {
-                        return fetch(url, { credentials: 'same-origin' }).then(function (resp) {
-                            const eRedirectDeLogin = resp.redirected && new URL(resp.url).pathname.endsWith('/login.php');
-                            if (resp.ok && !eRedirectDeLogin) {
-                                return cache.put(url, resp);
-                            }
-                        }).catch(function () {
-                            // Sem rede no momento do install: sem problema, essa página
-                            // fica pra ser cacheada na próxima visita online (handler de
-                            // "navigate" abaixo já faz isso sozinho).
-                        });
-                    }));
-                });
-            })
+            .then(function (cache) { return cache.addAll(PRECACHE_URLS); })
+            .then(recachearPaginasAutenticadas)
             .then(function () { return self.skipWaiting(); })
     );
+});
+
+// Disparado pela página (offline.js) logo depois de confirmar que o usuário
+// está logado. Cobre o caso do install ter rodado ANTES do primeiro login
+// (app instalado do zero): sem essa segunda chance, o cache de páginas
+// autenticadas ficava vazio até o usuário visitar cada tela manualmente.
+self.addEventListener('message', function (event) {
+    if (event.data && event.data.tipo === 'recachear-paginas') {
+        event.waitUntil(recachearPaginasAutenticadas());
+    }
 });
 
 self.addEventListener('activate', function (event) {
