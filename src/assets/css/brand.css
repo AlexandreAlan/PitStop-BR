@@ -169,10 +169,40 @@ body {
     min-width: 0;
 }
 
+.registro-info .text-muted.small {
+    font-size: .82rem;
+    line-height: 1.5;
+}
+
 .registro-valor-col {
     flex-shrink: 0;
     white-space: nowrap;
     margin-left: .5rem;
+}
+
+/* Legibilidade no dia a dia: cards com mais respiro entre si e alvos de
+   toque maiores (editar/excluir/concluir) — uso de uma mão, no posto. */
+.lista-registros .card,
+.lista-veiculos .card,
+.lista-lembretes .card {
+    margin-bottom: .75rem !important;
+}
+
+.lista-registros .card-body,
+.lista-veiculos .card-body,
+.lista-lembretes .card-body {
+    padding-top: .85rem !important;
+    padding-bottom: .85rem !important;
+}
+
+.registro-valor-col .btn,
+.lista-lembretes .btn {
+    min-width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
 }
 
 /* Estado vazio — convite à ação, não uma frase perdida no vazio */
@@ -257,18 +287,21 @@ body {
 .bottom-nav a {
     flex: 1;
     text-align: center;
-    padding: 0.55rem 0 0.5rem;
+    padding: 0.65rem 0 0.55rem;
     color: #8a8f98;
     text-decoration: none;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 500;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
+    min-height: 52px;
+    justify-content: center;
 }
 
 .bottom-nav a i {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     transition: transform .2s var(--ps-ease);
 }
 
@@ -304,7 +337,7 @@ body {
     transform: scale(.92);
 }
 
-body { padding-bottom: 76px; }
+body { padding-bottom: 86px; }
 
 /* Telas ≥992px: a barra de abas mobile vira uma sidebar compacta,
    e o conteúdo ganha uma largura de leitura própria em vez de esticar
@@ -566,6 +599,38 @@ body { padding-bottom: 76px; }
     background: rgba(var(--ps-shadow-rgb), .06);
     padding: .1rem .35rem;
     border-radius: .4rem;
+}
+
+/* Aviso "o que mudou" — aparece só nas 2 primeiras aberturas após uma
+   atualização (controle em localStorage, ver assets/js/offline.js) */
+.aviso-atualizacao-card .btn-close {
+    font-size: .75rem;
+    flex-shrink: 0;
+}
+
+/* Confirmação de ação salva offline — mesma linguagem visual do resto do
+   app, sempre visível acima da barra inferior fixa. */
+.toast-offline {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: calc(86px + env(safe-area-inset-bottom, 0));
+    background: var(--ps-dark);
+    color: #fff;
+    padding: .75rem 1rem;
+    border-radius: var(--ps-radius-md);
+    box-shadow: 0 8px 24px rgba(var(--ps-shadow-rgb), .25);
+    font-size: .9rem;
+    text-align: center;
+    z-index: 1050;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .25s var(--ps-ease), transform .25s var(--ps-ease);
+}
+
+.toast-offline.visivel {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* Impressão dos Relatórios — "Exportar PDF" é o próprio diálogo de
