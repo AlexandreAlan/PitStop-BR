@@ -1,0 +1,4 @@
+DSEG7-Classic (Bold) — copyright keshikan (http://www.keshikan.net/)
+Licensed under the SIL Open Font License, Version 1.1.
+Full license: http://scripts.sil.org/OFL
+Source: https://www.npmjs.com/package/dseg
