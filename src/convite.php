@@ -73,11 +73,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $marcarUsado = $pdo->prepare('UPDATE convites SET usado_em = NOW() WHERE id = :id');
                     $marcarUsado->execute([':id' => $conviteTravado['id']]);
+                    // Quem entra por convite recebeu o link direto no e-mail que o convidou —
+                    // isso já prova a posse do endereço, sem precisar de um segundo código.
+                    $pdo->prepare('UPDATE usuarios SET email_verificado_em = NOW() WHERE id = :id')
+                        ->execute([':id' => $resultado['id']]);
                     $pdo->commit();
 
                     session_regenerate_id(true);
                     $_SESSION['usuario_id']   = $resultado['id'];
                     $_SESSION['usuario_nome'] = $resultado['nome'];
+                    $_SESSION['usuario_role'] = 'user';
 
                     flashSet('sucesso', 'Conta criada com sucesso. Bem-vindo(a)!');
                     header('Location: index.php');
@@ -117,19 +122,19 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Nome</label>
-            <input type="text" name="nome" maxlength="100" class="form-control form-control-lg" value="<?= h($nome) ?>" required autofocus>
+            <label class="form-label">Nome completo</label>
+            <input type="text" name="nome" maxlength="100" class="form-control form-control-lg" placeholder="Nome e sobrenome" value="<?= h($nome) ?>" autocomplete="name" required autofocus>
         </div>
 
         <div class="mb-3">
             <label class="form-label">Senha</label>
-            <input type="password" name="senha" minlength="8" class="form-control form-control-lg" required>
+            <input type="password" name="senha" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
             <div class="form-text">Mínimo de 8 caracteres.</div>
         </div>
 
         <div class="mb-3">
             <label class="form-label">Confirmar senha</label>
-            <input type="password" name="confirmar_senha" minlength="8" class="form-control form-control-lg" required>
+            <input type="password" name="confirmar_senha" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
         </div>
 
         <div class="mb-4 form-check">
