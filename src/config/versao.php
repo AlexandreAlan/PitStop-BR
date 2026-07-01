@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.6.9';
+const APP_VERSION = '1.7.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.7.0',
+        'resumo'  => 'Cadastro de veículo ganhou cor, placa e busca de modelo: digite algo como "Bros 160 2025" e o app preenche sozinho o tanque e o peso, usando um catálogo dos veículos mais comuns no Brasil. Relatórios agora mostram seu consumo real comparado com o de fábrica quando o veículo tem modelo vinculado.',
+    ],
     [
         'versao'  => '1.6.9',
         'resumo'  => 'Removido o layout diferente de "computador" (menu lateral, colunas largas) que aparecia ao abrir no notebook/PC — agora fica exatamente igual ao celular em qualquer tamanho de tela, só centralizado.',
