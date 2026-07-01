@@ -4,8 +4,8 @@ require_once __DIR__ . '/config/bootstrap.php';
 
 $usuario = exigirLogin();
 
-$combustiveisPermitidos = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
-$categoriasDespesaPermitidas = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
+$combustiveisPermitidos = COMBUSTIVEIS_PERMITIDOS;
+$categoriasDespesaPermitidas = CATEGORIAS_DESPESA_PERMITIDAS;
 
 $erros = [];
 $dados = [
@@ -33,70 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['valor_pago']        = (string) ($_POST['valor_pago'] ?? '');
     $dados['descricao']         = trim((string) ($_POST['descricao'] ?? ''));
 
-    $veiculoId        = filter_var($dados['veiculo_id'], FILTER_VALIDATE_INT);
-    $kmAtual          = filter_var($dados['km_atual'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-    $tipoRegistro     = in_array($dados['tipo_registro'], ['Abastecimento', 'Manutencao', 'Despesa'], true) ? $dados['tipo_registro'] : null;
-    $valorPago        = filter_var($dados['valor_pago'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0]]);
-    $litros           = $dados['litros'] === '' ? null : filter_var($dados['litros'], FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
-    $combustivel      = in_array($dados['combustivel'], $combustiveisPermitidos, true) ? $dados['combustivel'] : null;
-    $categoriaDespesa = in_array($dados['categoria_despesa'], $categoriasDespesaPermitidas, true) ? $dados['categoria_despesa'] : null;
-    $dataRegistro     = DateTime::createFromFormat('Y-m-d', $dados['data']);
-
-    if (!$veiculoId) {
-        $erros[] = 'Selecione um veículo válido.';
-    } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuario['id']]);
-        if (!$existe->fetchColumn()) {
-            $erros[] = 'Veículo não encontrado.';
-        }
-    }
-    if (!$dataRegistro || $dataRegistro->format('Y-m-d') !== $dados['data']) {
-        $erros[] = 'Data inválida.';
-    }
-    if ($kmAtual === false || $kmAtual === null) {
-        $erros[] = 'KM atual inválido.';
-    }
-    if (!$tipoRegistro) {
-        $erros[] = 'Tipo de registro inválido.';
-    }
-    if ($valorPago === false || $valorPago === null) {
-        $erros[] = 'Valor pago inválido.';
-    }
-    if ($tipoRegistro === 'Abastecimento' && !$litros) {
-        $erros[] = 'Informe os litros abastecidos.';
-    }
-    if ($tipoRegistro === 'Abastecimento' && !$combustivel) {
-        $erros[] = 'Selecione o combustível.';
-    }
-    if ($tipoRegistro === 'Despesa' && !$categoriaDespesa) {
-        $erros[] = 'Selecione a categoria da despesa.';
-    }
-    if (mb_strlen($dados['descricao']) > 255) {
-        $erros[] = 'Descrição muito longa (máx. 255 caracteres).';
-    }
-
-    if (!$erros) {
-        $stmt = $pdo->prepare(
-            'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, categoria_despesa, valor_pago, descricao)
-             VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :categoria_despesa, :valor_pago, :descricao)'
-        );
-        $stmt->execute([
-            ':veiculo_id'        => $veiculoId,
-            ':data'              => $dataRegistro->format('Y-m-d'),
-            ':km_atual'          => $kmAtual,
-            ':tipo_registro'     => $tipoRegistro,
-            ':combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
-            ':litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
-            ':categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
-            ':valor_pago'        => $valorPago,
-            ':descricao'         => $dados['descricao'] !== '' ? $dados['descricao'] : null,
-        ]);
-
+    $resultado = validarRegistro($pdo, $usuario['id'], $dados);
+    if ($resultado['ok']) {
+        inserirRegistro($pdo, $resultado['valores']);
         flashSet('sucesso', 'Registro salvo com sucesso.');
         header('Location: index.php');
         exit;
     }
+    $erros = $resultado['erros'];
 }
 
 $veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
