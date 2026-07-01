@@ -45,7 +45,7 @@ $tituloPagina = 'PitStop BR';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="card card-resumo shadow-sm">
+<div class="card card-resumo">
     <div class="card-body text-center py-4">
         <p class="text-muted mb-1 small text-uppercase">Última Média</p>
         <?php if ($ultimaMedia !== null):
@@ -64,8 +64,13 @@ require __DIR__ . '/includes/header.php';
         <?php else: ?>
         <h2 class="display-6 fw-bold text-success mb-0"><i class="bi bi-speedometer2 me-1"></i>Sem dados</h2>
         <?php endif; ?>
-        <p class="text-muted small mb-1 mt-2">Gasto este mês</p>
-        <?= renderOdometro($gastoMes, 'Gasto este mês') ?>
+        <div class="gasto-mes-linha">
+            <span class="icone-chip icone-chip-laranja" aria-hidden="true"><i class="bi bi-cash-coin"></i></span>
+            <span class="text-start">
+                <span class="text-muted small d-block">Gasto este mês</span>
+                <span class="valor-destaque"><?= h(formatarMoeda($gastoMes)) ?></span>
+            </span>
+        </div>
     </div>
 </div>
 
@@ -146,10 +151,6 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     <?php endif; ?>
 </div>
-
-<a href="adicionar.php" class="btn btn-primary fab" aria-label="Adicionar Registro">
-    <i class="bi bi-plus-lg"></i>
-</a>
 
 <script src="assets/js/index.js"></script>
 <script src="assets/js/animacoes.js"></script>
