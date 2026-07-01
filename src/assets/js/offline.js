@@ -42,6 +42,28 @@ function registrarServiceWorker() {
     }).catch(function () {
         // Sem service worker, o app ainda funciona online normalmente — só perde o modo offline.
     });
+
+    navigator.serviceWorker.ready.then(pedirRecacheDePaginasSeLogado).catch(function () {});
+}
+
+/**
+ * O Service Worker pré-cacheia as páginas autenticadas no 'install' — mas se
+ * esse install rodou ANTES do primeiro login (app instalado do zero, ainda na
+ * tela de login), essas buscas vêm redirecionadas e são ignoradas. Sem essa
+ * segunda chance aqui, o cache ficava vazio até o usuário visitar cada tela
+ * manualmente com internet — daí o offline "não funcionar" logo depois de
+ * instalar. Disparado em toda página autenticada, com limite de 5 min entre
+ * tentativas pra não gerar tráfego à toa.
+ */
+function pedirRecacheDePaginasSeLogado(registro) {
+    if (!document.getElementById('pendencias-offline')) return;
+    if (!registro.active) return;
+
+    const ultimo = Number(localStorage.getItem('pitstop_ultimo_recache') || 0);
+    if (Date.now() - ultimo < 5 * 60 * 1000) return;
+    localStorage.setItem('pitstop_ultimo_recache', String(Date.now()));
+
+    registro.active.postMessage({ tipo: 'recachear-paginas' });
 }
 
 async function interceptarFormulariosOffline() {
