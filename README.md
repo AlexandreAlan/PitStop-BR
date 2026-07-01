@@ -21,7 +21,9 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
   sinal e sincronizam sozinhos assim que a conexão volta (inclusive em segundo plano, via
   Background Sync); aviso de "o que mudou" nas primeiras aberturas depois de uma atualização
 - Login com bloqueio temporário após tentativas falhas
-- Cadastro, edição e exclusão de veículos (nome + tipo: Moto/Carro/Outro)
+- Cadastro, edição e exclusão de veículos (nome, tipo, cor, placa) com busca inteligente de modelo
+  (ex.: "Bros 160 2025") que autopreenche capacidade do tanque e peso a partir de um catálogo de
+  modelos comuns no Brasil — campos continuam editáveis à mão se o modelo não estiver no catálogo
 - Registro, edição e exclusão de abastecimentos (km, litros, valor pago, combustível: Gasolina
   Comum/Aditivada, Etanol, Diesel, GNV ou Outro), manutenções (km, valor, descrição) e despesas
   (Seguro, IPVA, Estacionamento, Pedágio, Multa, Lavagem ou Outro)
@@ -30,7 +32,8 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - Cálculo automático da última média de consumo (km/l), do preço por litro e do gasto do mês
 - Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês e evolução do consumo, cards
   de gasto total, gasto médio por dia e preço médio por litro, filtro por veículo e por período
-  (data início/fim), e exportação em CSV ou PDF (impressão do navegador)
+  (data início/fim), exportação em CSV ou PDF (impressão do navegador), e comparação do consumo
+  real com o de fábrica (cidade/estrada) quando o veículo tem modelo do catálogo vinculado
 - Filtro de registros e relatórios por veículo
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
@@ -39,10 +42,10 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
   interface, e manifest PWA (instalável na tela inicial)
 - App Android nativo (TWA assinado) pra instalar via APK, além do PWA — página `/instalar.php`
   com instruções pras duas formas
-- Interface mobile-first (Bootstrap 5 + Bootstrap Icons) com navegação inferior fixa e botão de
-  novo registro embutido na própria barra (elevado, ao centro); em telas ≥992px a navegação vira
-  uma sidebar compacta e as páginas ganham layout de painel (ex.: gráficos em grade de 2 colunas
-  nos Relatórios)
+- Interface mobile-only por design (Bootstrap 5 + Bootstrap Icons) com navegação inferior fixa e
+  botão de novo registro embutido na própria barra (elevado, ao centro) — mesmo layout em qualquer
+  tamanho de tela, só centralizado numa largura de celular a partir de 560px (sem layout separado
+  de desktop/notebook)
 - Estados vazios com ícone, texto e chamada para ação em vez de mensagens soltas
 
 ## Stack
@@ -165,6 +168,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.7.0  | 2026-07-01 | Cadastro inteligente de veículo: novos campos cor/placa, e busca de modelo (`api/buscar_modelo.php`, separa texto de ano automaticamente — ex. "Bros 160 2025") que autopreenche tanque/peso a partir de um novo catálogo (`modelos_veiculos`, ~20 modelos comuns no Brasil). Relatórios ganham card de comparação do consumo real com o de fábrica (cidade/estrada) quando o veículo tem modelo vinculado. Testado com Playwright: busca retornando o modelo certo, autopreenchimento, salvamento no banco e card de comparação renderizando com os números certos |
 | 1.6.9  | 2026-07-01 | Removido o layout separado de desktop/notebook (sidebar, colunas largas) — o app é mobile-only de propósito agora, mesma disposição em qualquer tamanho de tela, só centralizada numa largura de celular a partir de 560px. `assets/js/viewport.js` removido (órfão, só existia pra decidir esse layout) |
 | 1.6.8  | 2026-07-01 | Duas correções: (1) offline logo após instalar o app do zero — o cache de páginas autenticadas só era preenchido no `install` (que roda antes do primeiro login) ou visitando cada tela manualmente; agora `offline.js` avisa o Service Worker via `postMessage` assim que confirma sessão ativa, recarregando o cache sem precisar navegar por tudo primeiro; (2) espaço vazio grande sobrando embaixo da tela em páginas com pouco conteúdo (ex.: nenhum registro ainda) — `body`/`.app-shell`/`main.container` viram uma coluna flex de altura real (`100dvh`), e o bloco de lista cresce pra preencher o espaço, centralizando só o estado vazio (listas com dados continuam alinhadas no topo). Ambas testadas com Playwright (instalação do zero + bloqueio de rede real, e inspeção do layout renderizado) |
 | 1.6.7  | 2026-07-01 | Duas correções sérias do modo offline: (1) o `install` do Service Worker agora busca cada página autenticada com a sessão atual e só cacheia se vier direto (sem redirect pra login) — antes, cada atualização de versão apagava o cache antigo e deixava tudo vazio até o usuário visitar cada página manualmente; (2) `offline.js` não confia mais só em `navigator.onLine` (que reporta "online" mesmo com wifi/dados sem internet de verdade) — testa uma busca real (`HEAD /manifest.json`, 2.5s) antes de deixar o formulário submeter nativamente, evitando o app travar no aviso de "confirmar reenvio do formulário" do navegador. Fallback final do SW também trocado por uma resposta com a marca do app em vez da tela genérica do navegador. Testado com Playwright com bloqueio de rede real (`route.abort`) |
