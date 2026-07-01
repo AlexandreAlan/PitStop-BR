@@ -8,12 +8,12 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="tab-instalar mb-3">
-    <button type="button" class="tab-btn ativo" data-tab="apk">📱 APK Android</button>
-    <button type="button" class="tab-btn" data-tab="pwa">🌐 Instalar (PWA)</button>
+    <button type="button" class="tab-btn ativo" data-tab="apk"><i class="bi bi-phone me-1"></i>APK Android</button>
+    <button type="button" class="tab-btn" data-tab="pwa"><i class="bi bi-globe2 me-1"></i>Instalar (PWA)</button>
 </div>
 
 <div id="pane-apk" class="pane-instalar ativo">
-    <a class="btn btn-primary btn-lg w-100 mb-3" href="downloads/pitstop-br.apk" download>⬇️ Baixar APK (Android)</a>
+    <a class="btn btn-primary btn-lg w-100 mb-3" href="downloads/pitstop-br.apk" download><i class="bi bi-download me-1"></i>Baixar APK (Android)</a>
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-body p-3">
             <h2 class="h6 text-muted mb-2">Como instalar o APK</h2>
@@ -22,7 +22,7 @@ require __DIR__ . '/includes/header.php';
                 <li class="mb-2">Abra o arquivo baixado (<code>pitstop-br.apk</code>).</li>
                 <li class="mb-2">O Android vai pedir pra permitir <strong>"instalar apps desconhecidos"</strong> — toque em <strong>Configurações</strong> e ative pro seu navegador.</li>
                 <li class="mb-2">Volte e toque em <strong>Instalar</strong>.</li>
-                <li>Pronto — o ícone <strong>PitStop BR</strong> aparece na tela inicial. 🎉</li>
+                <li>Pronto — o ícone <strong>PitStop BR</strong> aparece na tela inicial.</li>
             </ol>
         </div>
     </div>
@@ -36,9 +36,9 @@ require __DIR__ . '/includes/header.php';
             <h2 class="h6 text-muted mb-2">Instalar como PWA (sem APK)</h2>
             <ol class="small mb-0 ps-3">
                 <li class="mb-2">Abra <code>pitstop.morenadoaco.com.br</code> no <strong>Chrome</strong> (Android) ou <strong>Safari</strong> (iPhone).</li>
-                <li class="mb-2"><strong>Android:</strong> menu <strong>⋮</strong> → <strong>Adicionar à tela inicial</strong> / <strong>Instalar app</strong>.</li>
-                <li class="mb-2"><strong>iPhone:</strong> botão <strong>Compartilhar</strong> ⬆️ → <strong>Adicionar à Tela de Início</strong>.</li>
-                <li>Vira um ícone em tela cheia, igual a um app. ✅</li>
+                <li class="mb-2"><strong>Android:</strong> menu <i class="bi bi-three-dots-vertical"></i> → <strong>Adicionar à tela inicial</strong> / <strong>Instalar app</strong>.</li>
+                <li class="mb-2"><strong>iPhone:</strong> botão <strong>Compartilhar</strong> <i class="bi bi-box-arrow-up"></i> → <strong>Adicionar à Tela de Início</strong>.</li>
+                <li>Vira um ícone em tela cheia, igual a um app.</li>
             </ol>
         </div>
     </div>
