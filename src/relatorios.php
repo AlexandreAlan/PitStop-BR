@@ -424,7 +424,7 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script src="assets/js/index.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
 <script type="application/json" id="dados-relatorios"><?= json_encode([
     'gastoMes'    => ['labels' => $labelsGastoMes, 'valores' => $valoresGastoMes],
     'kmMes'       => ['labels' => $labelsKmMes, 'valores' => $valoresKmMes],
