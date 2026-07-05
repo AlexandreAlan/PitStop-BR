@@ -34,11 +34,17 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
   vencendo em uma data), com status Vencido/Próximo/Em dia e alerta no painel principal
 - Cálculo automático da última média de consumo (km/l), do preço por litro e do gasto do mês
 - Meta de gasto mensal configurável (Minha Conta), com barra de progresso colorida no painel
-  principal comparando o gasto do mês com a meta (verde/amarelo/vermelho)
-- Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês e evolução do consumo, cards
-  de gasto total, gasto médio por dia e preço médio por litro, filtro por veículo e por período
-  (data início/fim), exportação em CSV ou PDF (impressão do navegador), e comparação do consumo
-  real com o de fábrica (cidade/estrada) quando o veículo tem modelo do catálogo vinculado
+  principal comparando o gasto do mês com a meta (verde/amarelo/vermelho) e projeção de gasto até
+  o fim do mês no ritmo atual
+- Calculadora Etanol × Gasolina (regra dos 70%, com limiar ajustável) pra saber na hora qual
+  combustível compensa mais
+- Relatórios com gráficos (Chart.js): gasto por mês, km rodado por mês, evolução do consumo e
+  distribuição do gasto por categoria (combustível, manutenção, cada tipo de despesa), cards de
+  gasto total, custo por km, gasto médio por dia e preço médio por litro, atalhos de período (este
+  mês, últimos 30 dias, este ano) além do filtro manual por veículo e por data, exportação em CSV
+  ou PDF (impressão do navegador), comparação do consumo real com o de fábrica (cidade/estrada)
+  quando o veículo tem modelo do catálogo vinculado, e tabela comparando consumo/custo por
+  km/gasto entre todos os veículos de quem tem 2 ou mais cadastrados
 - Filtro de registros e relatórios por veículo
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
@@ -103,8 +109,10 @@ pitstop-br/
     ├── convidar.php / convite.php              # envio e aceite de convite (registro por convite)
     ├── gerenciador.php     # painel administrativo (dados agregados por conta; só para papel admin)
     ├── conta.php / privacidade.php             # minha conta (exclusão de dados) e política LGPD
-    ├── index.php           # dashboard (última média, gastos do mês, alerta de lembretes, registros)
-    ├── relatorios.php      # gráficos de gasto, km rodado e consumo; filtro por período; export CSV/PDF
+    ├── combustivel.php     # calculadora Etanol x Gasolina (regra dos 70%)
+    ├── index.php           # dashboard (última média, gastos do mês + projeção, alerta de lembretes, registros)
+    ├── relatorios.php      # gráficos de gasto/km/consumo/categorias, custo por km, comparação entre
+    │                       # veículos, atalhos de período; filtro por período; export CSV/PDF
     ├── adicionar.php / registro_editar.php / excluir.php   # CRUD de registros (abastecimento/manutenção/despesa)
     ├── lembretes.php / lembrete_concluir.php / lembrete_excluir.php   # lembretes de manutenção (km ou data)
     └── veiculos.php / veiculo_editar.php / veiculo_excluir.php   # CRUD de veículos
@@ -174,6 +182,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.10.0 | 2026-07-05 | Quatro melhorias práticas sem tocar no schema: `combustivel.php` (nova página, calculadora Etanol × Gasolina com limiar ajustável, link no dropdown da conta e atalho no dashboard); `relatorios.php` ganha o card "Custo por Km" (grade 2×2 de stats) e o gráfico rosca "Para Onde Vai o Dinheiro" (nova query agrupando por categoria calculada — combustível/manutenção/categoria de despesa); nova função `calcularEstatisticasVeiculo()` em `functions.php` alimenta uma tabela de comparação entre veículos (consumo médio, custo/km, gasto no período) exibida só com 2+ veículos cadastrados; dashboard mostra projeção de gasto do mês (mantendo o ritmo diário atual) comparada com a meta, e Relatórios ganham atalhos "Este mês/Últimos 30 dias/Este ano" que preenchem as datas e enviam o filtro via JS. `combustivel.php` e seu JS entram em `PAGINAS_AUTENTICADAS`/`PRECACHE_URLS` do Service Worker. Testado com Playwright em produção: calculadora nos dois vereditos, gráfico de categorias renderizando, atalhos de período filtrando, ausência de erros de console |
 | 1.9.0  | 2026-07-05 | Recuperação de senha: `esqueci_senha.php` (rate limit de 5/hora por IP, tabela `redefinicao_rate_limit`, sempre responde com a mesma mensagem genérica pra não revelar se o e-mail existe) gera um token de uso único (tabela `redefinicoes_senha`, só o hash é guardado, válido por 1h) e manda por e-mail um link pra `redefinir_senha.php`, que troca a senha (com lock via transação, igual ao aceite de convite) e zera bloqueio/tentativas falhas da conta. Tela de login ganhou checkbox "Lembrar meu e-mail" (guardado só no `localStorage` do aparelho, nunca a senha) e botão de olho pra mostrar/ocultar senha (`assets/js/auth.js`), replicado no cadastro e na redefinição. Testado com Playwright: geração do token em produção, página de link inválido/expirado, toggle de senha e ausência de erros de console |
 | 1.8.0  | 2026-07-05 | Meta de gasto mensal: nova coluna `usuarios.meta_mensal`, formulário em `conta.php` (ação `salvar_meta`, aceita vírgula ou ponto decimal, vazio remove a meta) e barra de progresso colorida no card de resumo do dashboard (`index.php`) comparando gasto do mês vs. meta — verde até 70%, amarelo até estourar, vermelho acima de 100%, com texto de quanto falta ou quanto passou. Corrigido também bug visual em `instalar.php`: a fingerprint SHA-256 do APK estourava a largura da tela em telas estreitas (sem quebra de linha) — nova classe `.fingerprint-apk` (`word-break: break-all`) e `overflow-x: hidden` no `body` como rede de segurança. Testado com Playwright: login real, ajuste da meta nos três estados (ok/atenção/estourada) e remoção, e `scrollWidth`/`clientWidth` de `instalar.php` confirmando ausência de overflow |
 | 1.7.0  | 2026-07-01 | Cadastro inteligente de veículo: novos campos cor/placa, e busca de modelo (`api/buscar_modelo.php`, separa texto de ano automaticamente — ex. "Bros 160 2025") que autopreenche tanque/peso a partir de um novo catálogo (`modelos_veiculos`, ~20 modelos comuns no Brasil). Relatórios ganham card de comparação do consumo real com o de fábrica (cidade/estrada) quando o veículo tem modelo vinculado. Testado com Playwright: busca retornando o modelo certo, autopreenchimento, salvamento no banco e card de comparação renderizando com os números certos |
