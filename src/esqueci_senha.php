@@ -60,6 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>';
 
                 enviarEmail($email, 'Redefinir sua senha — PitStop BR', $corpoHtml);
+            } else {
+                // Sem isso, dá pra descobrir quais e-mails têm conta só pelo tempo de
+                // resposta: o caminho "existe" demora bem mais (gera token + conecta
+                // no SMTP de verdade) que o caminho "não existe" (só o SELECT). Um
+                // atraso aproximado aqui fecha esse canal, mesmo com a mensagem
+                // final sendo idêntica nos dois casos.
+                usleep(random_int(300000, 700000));
             }
 
             // Mesma resposta exista ou não a conta, pra não revelar quais e-mails têm cadastro.
