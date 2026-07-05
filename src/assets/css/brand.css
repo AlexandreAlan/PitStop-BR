@@ -175,7 +175,10 @@ body {
 }
 
 .card-resumo {
-    margin: -1.5rem 1rem 1.5rem;
+    /* Mesmo recuo lateral dos demais cards da página (.25rem, igual ao
+       mx-1/px-1 usado abaixo) — antes usava 1rem e ficava mais estreito que
+       o resto, quebrando o alinhamento de borda ao rolar a tela. */
+    margin: -1.5rem .25rem 1.5rem;
     border-radius: var(--ps-radius-lg);
     border: none;
     box-shadow: 0 2px 8px rgba(var(--ps-shadow-rgb), .06), 0 12px 28px rgba(var(--ps-shadow-rgb), .08);
