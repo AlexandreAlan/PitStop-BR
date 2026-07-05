@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.10.0',
+        'resumo'  => 'Quatro novidades práticas: (1) calculadora Etanol × Gasolina (menu da conta) que diz na hora qual compensa abastecer; (2) Relatórios ganharam o card "Custo por Km" e o gráfico "Para Onde Vai o Dinheiro" (combustível, manutenção e cada categoria de despesa); (3) quem tem 2+ veículos agora vê uma tabela comparando consumo, custo/km e gasto de cada um lado a lado; (4) o painel principal mostra a projeção de gasto do mês (mantendo o ritmo atual) e os Relatórios ganharam atalhos "Este mês / Últimos 30 dias / Este ano" pra não digitar as datas na mão.',
+    ],
     [
         'versao'  => '1.9.0',
         'resumo'  => 'Chegou a recuperação de senha: esqueceu a senha? Peça um link por e-mail em "Esqueceu a senha?" na tela de login (o link vale por 1h e só funciona uma vez). A tela de login também ganhou a opção de lembrar seu e-mail no aparelho e um botão de olho pra mostrar/ocultar a senha digitada (também no cadastro e na redefinição).',
