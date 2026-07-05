@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.9.0',
+        'resumo'  => 'Chegou a recuperação de senha: esqueceu a senha? Peça um link por e-mail em "Esqueceu a senha?" na tela de login (o link vale por 1h e só funciona uma vez). A tela de login também ganhou a opção de lembrar seu e-mail no aparelho e um botão de olho pra mostrar/ocultar a senha digitada (também no cadastro e na redefinição).',
+    ],
     [
         'versao'  => '1.8.0',
         'resumo'  => 'Nova Meta de Gasto Mensal: defina um teto de gasto por mês em Minha Conta e acompanhe o progresso com uma barra colorida no painel principal (verde até 70%, amarelo até estourar, vermelho quando passa da meta). Também corrigido um bug visual na página de instalação: a "impressão digital" (SHA-256) do APK estourava a largura da tela em vez de quebrar linha.',
