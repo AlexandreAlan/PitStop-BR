@@ -241,4 +241,7 @@ require __DIR__ . '/includes/header.php';
 
 <script src="assets/js/index.js"></script>
 <script src="assets/js/animacoes.js"></script>
+<?php if (($_GET['diag'] ?? '') === '1'): ?>
+<script src="assets/js/diag.js"></script>
+<?php endif; ?>
 <?php require __DIR__ . '/includes/footer.php'; ?>
