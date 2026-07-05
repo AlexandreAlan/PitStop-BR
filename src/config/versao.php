@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.8.0',
+        'resumo'  => 'Nova Meta de Gasto Mensal: defina um teto de gasto por mês em Minha Conta e acompanhe o progresso com uma barra colorida no painel principal (verde até 70%, amarelo até estourar, vermelho quando passa da meta). Também corrigido um bug visual na página de instalação: a "impressão digital" (SHA-256) do APK estourava a largura da tela em vez de quebrar linha.',
+    ],
     [
         'versao'  => '1.7.0',
         'resumo'  => 'Cadastro de veículo ganhou cor, placa e busca de modelo: digite algo como "Bros 160 2025" e o app preenche sozinho o tanque e o peso, usando um catálogo dos veículos mais comuns no Brasil. Relatórios agora mostram seu consumo real comparado com o de fábrica quando o veículo tem modelo vinculado.',
