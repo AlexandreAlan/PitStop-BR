@@ -79,6 +79,14 @@ html {
 
 body {
     background-color: var(--ps-bg);
+    overflow-x: hidden;
+}
+
+.fingerprint-apk {
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    line-height: 1.4;
 }
 
 .stat-valor,

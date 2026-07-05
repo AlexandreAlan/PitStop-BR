@@ -26,7 +26,8 @@ require __DIR__ . '/includes/header.php';
             </ol>
         </div>
     </div>
-    <p class="text-center text-muted small">App assinado · SHA-256: D2:57:C8:5B:61:E9:3A:3E:C2:40:1A:D2:11:52:BD:F2:70:58:1E:F7:16:2B:FC:FF:40:DF:EB:DD:19:25:AB:47</p>
+    <p class="text-center text-muted small mb-1">App assinado</p>
+    <p class="text-center text-muted fingerprint-apk">SHA-256: D2:57:C8:5B:61:E9:3A:3E:C2:40:1A:D2:11:52:BD:F2:70:58:1E:F7:16:2B:FC:FF:40:DF:EB:DD:19:25:AB:47</p>
 </div>
 
 <div id="pane-pwa" class="pane-instalar">
