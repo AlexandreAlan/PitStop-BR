@@ -51,9 +51,22 @@ require __DIR__ . '/includes/header.php';
             <input type="email" name="email" class="form-control form-control-lg" value="<?= h($email) ?>" autocomplete="email" required autofocus>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-2">
             <label class="form-label">Senha</label>
-            <input type="password" name="senha" class="form-control form-control-lg" autocomplete="current-password" required>
+            <div class="input-group">
+                <input type="password" name="senha" id="campoSenhaLogin" class="form-control form-control-lg" autocomplete="current-password" required>
+                <button type="button" class="btn btn-outline-secondary campo-senha-toggle" data-alvo="campoSenhaLogin" tabindex="-1" aria-label="Mostrar senha">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <div class="form-check mb-0">
+                <input type="checkbox" id="lembrarEmail" class="form-check-input">
+                <label class="form-check-label small" for="lembrarEmail">Lembrar meu e-mail</label>
+            </div>
+            <a href="esqueci_senha.php" class="small">Esqueceu a senha?</a>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
@@ -65,6 +78,8 @@ require __DIR__ . '/includes/header.php';
         </p>
     </div>
 </form>
+
+<script src="assets/js/auth.js"></script>
 
 <p class="text-center mt-3 mb-0">
     <a href="instalar.php" class="small text-white-50"><i class="bi bi-phone me-1"></i>Instalar o app no celular</a>

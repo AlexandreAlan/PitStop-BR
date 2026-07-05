@@ -96,13 +96,23 @@ require __DIR__ . '/includes/header.php';
 
         <div class="mb-3">
             <label class="form-label">Senha</label>
-            <input type="password" name="senha" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
+            <div class="input-group">
+                <input type="password" name="senha" id="campoSenhaCadastro" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
+                <button type="button" class="btn btn-outline-secondary campo-senha-toggle" data-alvo="campoSenhaCadastro" tabindex="-1" aria-label="Mostrar senha">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
             <div class="form-text">Mínimo de 8 caracteres.</div>
         </div>
 
         <div class="mb-3">
             <label class="form-label">Confirmar senha</label>
-            <input type="password" name="confirmar_senha" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
+            <div class="input-group">
+                <input type="password" name="confirmar_senha" id="campoConfirmarSenhaCadastro" minlength="8" class="form-control form-control-lg" autocomplete="new-password" required>
+                <button type="button" class="btn btn-outline-secondary campo-senha-toggle" data-alvo="campoConfirmarSenhaCadastro" tabindex="-1" aria-label="Mostrar senha">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
         </div>
 
         <div class="mb-4 form-check">
@@ -126,4 +136,5 @@ require __DIR__ . '/includes/header.php';
     </div>
 </form>
 
+<script src="assets/js/auth.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
