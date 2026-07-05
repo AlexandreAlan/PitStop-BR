@@ -20,7 +20,10 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - Funciona sem internet: Service Worker + fila offline (IndexedDB) guardam o que você registra sem
   sinal e sincronizam sozinhos assim que a conexão volta (inclusive em segundo plano, via
   Background Sync); aviso de "o que mudou" nas primeiras aberturas depois de uma atualização
-- Login com bloqueio temporário após tentativas falhas
+- Login com bloqueio temporário após tentativas falhas, opção de lembrar o e-mail no aparelho (sem
+  guardar senha) e botão de mostrar/ocultar senha nos campos de senha
+- Recuperação de senha esquecida por link de e-mail (token único de uso único, válido por 1h, sem
+  revelar se o e-mail existe na base)
 - Cadastro, edição e exclusão de veículos (nome, tipo, cor, placa) com busca inteligente de modelo
   (ex.: "Bros 160 2025") que autopreenche capacidade do tanque e peso a partir de um catálogo de
   modelos comuns no Brasil — campos continuam editáveis à mão se o modelo não estiver no catálogo
@@ -96,6 +99,7 @@ pitstop-br/
     ├── manifest.json       # manifest PWA (instalável na tela inicial)
     ├── sw.php              # Service Worker (cache com versionamento, fallback offline, Background Sync)
     ├── login.php / cadastro.php / verificar_email.php / logout.php   # autenticação + confirmação de e-mail
+    ├── esqueci_senha.php / redefinir_senha.php # recuperação de senha por link de e-mail (token único, 1h)
     ├── convidar.php / convite.php              # envio e aceite de convite (registro por convite)
     ├── gerenciador.php     # painel administrativo (dados agregados por conta; só para papel admin)
     ├── conta.php / privacidade.php             # minha conta (exclusão de dados) e política LGPD
@@ -170,6 +174,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.9.0  | 2026-07-05 | Recuperação de senha: `esqueci_senha.php` (rate limit de 5/hora por IP, tabela `redefinicao_rate_limit`, sempre responde com a mesma mensagem genérica pra não revelar se o e-mail existe) gera um token de uso único (tabela `redefinicoes_senha`, só o hash é guardado, válido por 1h) e manda por e-mail um link pra `redefinir_senha.php`, que troca a senha (com lock via transação, igual ao aceite de convite) e zera bloqueio/tentativas falhas da conta. Tela de login ganhou checkbox "Lembrar meu e-mail" (guardado só no `localStorage` do aparelho, nunca a senha) e botão de olho pra mostrar/ocultar senha (`assets/js/auth.js`), replicado no cadastro e na redefinição. Testado com Playwright: geração do token em produção, página de link inválido/expirado, toggle de senha e ausência de erros de console |
 | 1.8.0  | 2026-07-05 | Meta de gasto mensal: nova coluna `usuarios.meta_mensal`, formulário em `conta.php` (ação `salvar_meta`, aceita vírgula ou ponto decimal, vazio remove a meta) e barra de progresso colorida no card de resumo do dashboard (`index.php`) comparando gasto do mês vs. meta — verde até 70%, amarelo até estourar, vermelho acima de 100%, com texto de quanto falta ou quanto passou. Corrigido também bug visual em `instalar.php`: a fingerprint SHA-256 do APK estourava a largura da tela em telas estreitas (sem quebra de linha) — nova classe `.fingerprint-apk` (`word-break: break-all`) e `overflow-x: hidden` no `body` como rede de segurança. Testado com Playwright: login real, ajuste da meta nos três estados (ok/atenção/estourada) e remoção, e `scrollWidth`/`clientWidth` de `instalar.php` confirmando ausência de overflow |
 | 1.7.0  | 2026-07-01 | Cadastro inteligente de veículo: novos campos cor/placa, e busca de modelo (`api/buscar_modelo.php`, separa texto de ano automaticamente — ex. "Bros 160 2025") que autopreenche tanque/peso a partir de um novo catálogo (`modelos_veiculos`, ~20 modelos comuns no Brasil). Relatórios ganham card de comparação do consumo real com o de fábrica (cidade/estrada) quando o veículo tem modelo vinculado. Testado com Playwright: busca retornando o modelo certo, autopreenchimento, salvamento no banco e card de comparação renderizando com os números certos |
 | 1.6.9  | 2026-07-01 | Removido o layout separado de desktop/notebook (sidebar, colunas largas) — o app é mobile-only de propósito agora, mesma disposição em qualquer tamanho de tela, só centralizada numa largura de celular a partir de 560px. `assets/js/viewport.js` removido (órfão, só existia pra decidir esse layout) |
