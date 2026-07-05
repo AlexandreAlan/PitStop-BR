@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     tentativas_falhas TINYINT UNSIGNED NOT NULL DEFAULT 0,
     bloqueado_ate DATETIME NULL,
     aceite_privacidade_em DATETIME NULL,
+    meta_mensal DECIMAL(10,2) NULL,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_usuarios_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

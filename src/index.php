@@ -57,6 +57,11 @@ if ($veiculoIdFiltro !== null) {
 $stmt->execute();
 $gastoMes = (float) $stmt->fetchColumn();
 
+$metaStmt = $pdo->prepare('SELECT meta_mensal FROM usuarios WHERE id = :id');
+$metaStmt->execute([':id' => $usuario['id']]);
+$metaMensalValor = $metaStmt->fetchColumn();
+$metaMensal = $metaMensalValor !== null ? (float) $metaMensalValor : null;
+
 $tituloPagina = 'PitStop BR';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -87,6 +92,29 @@ require __DIR__ . '/includes/header.php';
                 <span class="valor-destaque"><?= h(formatarMoeda($gastoMes)) ?></span>
             </span>
         </div>
+
+        <?php if ($metaMensal !== null && $metaMensal > 0):
+            $percentualMeta = $gastoMes / $metaMensal;
+            $percentualBarra = max(0.0, min(1.0, $percentualMeta));
+            $estadoMeta = $percentualMeta >= 1.0 ? 'estourada' : ($percentualMeta >= 0.7 ? 'atencao' : 'ok');
+        ?>
+        <div class="meta-mensal mt-3">
+            <div class="meta-mensal-legenda">
+                <span class="text-muted small">Meta do mês: <?= h(formatarMoeda($metaMensal)) ?></span>
+                <span class="small fw-semibold meta-mensal-percentual meta-mensal-<?= $estadoMeta ?>">
+                    <?= h(number_format($percentualMeta * 100, 0, ',', '.')) ?>%
+                </span>
+            </div>
+            <div class="meta-mensal-trilho">
+                <div class="meta-mensal-progresso meta-mensal-<?= $estadoMeta ?>" style="width: <?= h((string) round($percentualBarra * 100, 2)) ?>%"></div>
+            </div>
+            <?php if ($estadoMeta === 'estourada'): ?>
+            <p class="small text-danger mb-0 mt-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Meta estourada em <?= h(formatarMoeda($gastoMes - $metaMensal)) ?>.</p>
+            <?php else: ?>
+            <p class="small text-muted mb-0 mt-1">Faltam <?= h(formatarMoeda($metaMensal - $gastoMes)) ?> pra bater a meta.</p>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

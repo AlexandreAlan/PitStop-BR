@@ -4,11 +4,36 @@ require_once __DIR__ . '/config/bootstrap.php';
 
 $usuario = exigirLogin();
 
-$dadosStmt = $pdo->prepare('SELECT nome, email, criado_em, aceite_privacidade_em FROM usuarios WHERE id = :id');
+$dadosStmt = $pdo->prepare('SELECT nome, email, criado_em, aceite_privacidade_em, meta_mensal FROM usuarios WHERE id = :id');
 $dadosStmt->execute([':id' => $usuario['id']]);
 $dadosUsuario = $dadosStmt->fetch();
 
 $erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'salvar_meta') {
+    csrfVerificarOuFalhar();
+
+    $metaBruta = trim((string) ($_POST['meta_mensal'] ?? ''));
+    $metaNormalizada = str_replace(',', '.', $metaBruta);
+
+    if ($metaBruta === '') {
+        $atualiza = $pdo->prepare('UPDATE usuarios SET meta_mensal = NULL WHERE id = :id');
+        $atualiza->execute([':id' => $usuario['id']]);
+        $dadosUsuario['meta_mensal'] = null;
+        flashSet('sucesso', 'Meta de gasto mensal removida.');
+        header('Location: conta.php');
+        exit;
+    } elseif (!is_numeric($metaNormalizada) || (float) $metaNormalizada <= 0) {
+        $erros[] = 'Informe um valor válido (maior que zero) para a meta mensal.';
+    } else {
+        $metaValor = round((float) $metaNormalizada, 2);
+        $atualiza = $pdo->prepare('UPDATE usuarios SET meta_mensal = :meta WHERE id = :id');
+        $atualiza->execute([':meta' => $metaValor, ':id' => $usuario['id']]);
+        flashSet('sucesso', 'Meta de gasto mensal atualizada.');
+        header('Location: conta.php');
+        exit;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'excluir_conta') {
     csrfVerificarOuFalhar();
@@ -55,6 +80,30 @@ require __DIR__ . '/includes/header.php';
         <p class="mb-0 small text-muted">
             <a href="privacidade.php">Ver Política de Privacidade</a>
         </p>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <h6 class="text-muted mb-1"><i class="bi bi-bullseye me-1"></i>Meta de Gasto Mensal</h6>
+        <p class="small text-muted mb-3">Defina um teto de gasto por mês (combustível, manutenção e
+        despesas somados). O painel principal mostra o progresso com uma barra colorida.</p>
+
+        <form method="post" action="conta.php" class="d-flex gap-2 align-items-start">
+            <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+            <input type="hidden" name="acao" value="salvar_meta">
+
+            <div class="flex-grow-1">
+                <div class="input-group">
+                    <span class="input-group-text">R$</span>
+                    <input type="text" inputmode="decimal" name="meta_mensal" class="form-control"
+                        placeholder="Ex: 600,00"
+                        value="<?= $dadosUsuario['meta_mensal'] !== null ? h(number_format((float) $dadosUsuario['meta_mensal'], 2, ',', '')) : '' ?>">
+                </div>
+                <div class="form-text">Deixe em branco e salve pra remover a meta.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+        </form>
     </div>
 </div>
 

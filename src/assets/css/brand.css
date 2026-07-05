@@ -181,6 +181,45 @@ body {
     box-shadow: 0 2px 8px rgba(var(--ps-shadow-rgb), .06), 0 12px 28px rgba(var(--ps-shadow-rgb), .08);
 }
 
+/* Meta de gasto mensal — barra de progresso colorida no card de resumo do
+   dashboard (verde até 70%, amarelo até estourar, vermelho acima da meta). */
+.meta-mensal {
+    text-align: left;
+}
+
+.meta-mensal-legenda {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: .35rem;
+}
+
+.meta-mensal-trilho {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(var(--ps-shadow-rgb), .08);
+    overflow: hidden;
+}
+
+.meta-mensal-progresso {
+    height: 100%;
+    border-radius: 999px;
+    transition: width .4s var(--ps-ease);
+}
+
+.meta-mensal-ok.meta-mensal-progresso,
+.meta-mensal-ok.meta-mensal-percentual { color: var(--ps-teal); }
+.meta-mensal-ok.meta-mensal-progresso { background: var(--ps-teal); }
+
+.meta-mensal-atencao.meta-mensal-progresso,
+.meta-mensal-atencao.meta-mensal-percentual { color: #c98a12; }
+.meta-mensal-atencao.meta-mensal-progresso { background: #f5a623; }
+
+.meta-mensal-estourada.meta-mensal-progresso,
+.meta-mensal-estourada.meta-mensal-percentual { color: var(--ps-danger); }
+.meta-mensal-estourada.meta-mensal-progresso { background: var(--ps-danger); }
+
 /* Reserva espaço pra ação de novo registro não colar na borda dos cards da lista */
 .registro-info {
     min-width: 0;
