@@ -62,6 +62,12 @@ $metaStmt->execute([':id' => $usuario['id']]);
 $metaMensalValor = $metaStmt->fetchColumn();
 $metaMensal = $metaMensalValor !== null ? (float) $metaMensalValor : null;
 
+// Projeção simples: mantendo o ritmo de gasto diário do mês corrente até o fim dele.
+$hoje = new DateTime('today');
+$diaAtual = (int) $hoje->format('j');
+$diasNoMes = (int) $hoje->format('t');
+$projecaoMes = $gastoMes > 0 ? ($gastoMes / $diaAtual) * $diasNoMes : 0.0;
+
 $tituloPagina = 'PitStop BR';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -93,6 +99,12 @@ require __DIR__ . '/includes/header.php';
             </span>
         </div>
 
+        <?php if ($gastoMes > 0 && $metaMensal === null): ?>
+        <p class="small text-muted mt-2 mb-0">
+            <i class="bi bi-graph-up-arrow me-1"></i>Projeção do mês: <?= h(formatarMoeda($projecaoMes)) ?> no ritmo atual.
+        </p>
+        <?php endif; ?>
+
         <?php if ($metaMensal !== null && $metaMensal > 0):
             $percentualMeta = $gastoMes / $metaMensal;
             $percentualBarra = max(0.0, min(1.0, $percentualMeta));
@@ -112,11 +124,20 @@ require __DIR__ . '/includes/header.php';
             <p class="small text-danger mb-0 mt-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Meta estourada em <?= h(formatarMoeda($gastoMes - $metaMensal)) ?>.</p>
             <?php else: ?>
             <p class="small text-muted mb-0 mt-1">Faltam <?= h(formatarMoeda($metaMensal - $gastoMes)) ?> pra bater a meta.</p>
+                <?php if ($projecaoMes > $metaMensal): ?>
+                <p class="small text-warning-emphasis mb-0 mt-1"><i class="bi bi-graph-up-arrow me-1"></i>No ritmo atual, a projeção do mês (<?= h(formatarMoeda($projecaoMes)) ?>) vai passar da meta.</p>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>
 </div>
+
+<a href="combustivel.php" class="d-flex align-items-center gap-2 mx-1 mb-3 text-decoration-none atalho-ferramenta">
+    <span class="icone-chip icone-chip-teal" aria-hidden="true"><i class="bi bi-fuel-pump"></i></span>
+    <span class="small fw-semibold">Etanol × Gasolina: qual compensa?</span>
+    <i class="bi bi-chevron-right ms-auto text-muted small" aria-hidden="true"></i>
+</a>
 
 <?php if ($lembretesAtencao): ?>
 <a href="lembretes.php" class="alert <?= $lembretesAtencao[0]['status'] === 'vencido' ? 'alert-danger' : 'alert-warning' ?> py-2 px-3 d-flex align-items-center gap-2 mx-1 mb-3 text-decoration-none">
