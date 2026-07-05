@@ -61,12 +61,12 @@ if (($_GET['formato'] ?? '') === 'csv') {
     foreach ($linhasExportacao as $l) {
         fputcsv($saida, [
             (new DateTime($l['data']))->format('d/m/Y'),
-            $l['veiculo'],
+            sanitizarCelulaCsv($l['veiculo']),
             $l['tipo_registro'],
             $l['combustivel'] ?? $l['categoria_despesa'] ?? '',
             $l['litros'] !== null ? number_format((float) $l['litros'], 2, ',', '.') : '',
             number_format((float) $l['valor_pago'], 2, ',', '.'),
-            (string) $l['descricao'],
+            sanitizarCelulaCsv((string) $l['descricao']),
         ], ';');
     }
     fclose($saida);

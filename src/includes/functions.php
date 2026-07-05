@@ -37,6 +37,21 @@ function formatarMoeda(float $valor): string
 }
 
 /**
+ * Neutraliza CSV/Formula Injection: Excel, LibreOffice e Google Sheets tratam
+ * células que começam com =, +, -, @, tab ou retorno de carro como fórmula —
+ * um nome de veículo ou descrição de registro (texto livre do usuário) com
+ * esse prefixo executaria a "fórmula" ao abrir o arquivo (ex.: chamando um
+ * programa externo via DDE). Prefixar com aspas simples força texto puro.
+ */
+function sanitizarCelulaCsv(string $valor): string
+{
+    if ($valor !== '' && str_contains("=+-@\t\r", $valor[0])) {
+        return "'" . $valor;
+    }
+    return $valor;
+}
+
+/**
  * KM/L calculado a partir dos dois últimos abastecimentos (por KM), não por data.
  * Sempre restrito aos veículos do usuário informado.
  */
