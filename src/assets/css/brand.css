@@ -223,6 +223,21 @@ body {
 .meta-mensal-estourada.meta-mensal-percentual { color: var(--ps-danger); }
 .meta-mensal-estourada.meta-mensal-progresso { background: var(--ps-danger); }
 
+/* Atalho de ferramenta (ex.: Etanol x Gasolina) no dashboard — link discreto
+   com o mesmo selo de ícone das estatísticas, não compete com os cards. */
+.atalho-ferramenta {
+    background: #fff;
+    border-radius: var(--ps-radius-md);
+    padding: .65rem .9rem;
+    color: var(--ps-ink);
+    box-shadow: 0 1px 4px rgba(var(--ps-shadow-rgb), .05);
+    transition: transform .15s var(--ps-ease);
+}
+
+.atalho-ferramenta:active {
+    transform: scale(.98);
+}
+
 /* Reserva espaço pra ação de novo registro não colar na borda dos cards da lista */
 .registro-info {
     min-width: 0;

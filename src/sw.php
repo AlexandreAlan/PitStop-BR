@@ -26,6 +26,7 @@ const PRECACHE_URLS = [
     '/assets/js/lembretes.js',
     '/assets/js/veiculos.js',
     '/assets/js/relatorios.js',
+    '/assets/js/combustivel.js',
     '/assets/js/animacoes.js',
     '/assets/js/offline.js',
     '/assets/js/idb-outbox.js',
@@ -53,6 +54,7 @@ const PAGINAS_AUTENTICADAS = [
     '/veiculos.php',
     '/lembretes.php',
     '/conta.php',
+    '/combustivel.php',
 ];
 
 function recachearPaginasAutenticadas() {

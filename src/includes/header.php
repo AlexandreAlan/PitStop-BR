@@ -36,6 +36,7 @@
         <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="conta.php"><i class="bi bi-person me-2"></i>Minha Conta</a></li>
             <li><a class="dropdown-item" href="convidar.php"><i class="bi bi-send me-2"></i>Convidar Pessoas</a></li>
+            <li><a class="dropdown-item" href="combustivel.php"><i class="bi bi-fuel-pump me-2"></i>Etanol × Gasolina</a></li>
             <?php if (($usuarioLogado['role'] ?? null) === 'admin'): ?>
             <li><a class="dropdown-item" href="gerenciador.php"><i class="bi bi-speedometer me-2"></i>Painel Administrativo</a></li>
             <?php endif; ?>
