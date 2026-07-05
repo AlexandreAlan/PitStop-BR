@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.10.1',
+        'resumo'  => 'Auditoria de segurança: corrigido um jeito de manipular o arquivo exportado em Relatórios (CSV) caso alguém colocasse um nome de veículo malicioso; adicionado limite de tentativas de login por IP (além do bloqueio por conta que já existia); fechado um jeito de descobrir se um e-mail tem conta pelo tempo de resposta da recuperação de senha; e reforçada a proteção contra adulteração dos arquivos carregados de fora (Bootstrap, ícones, gráficos) e contra ataques de downgrade de HTTPS. Sem mudança visível pro usuário.',
+    ],
     [
         'versao'  => '1.10.0',
         'resumo'  => 'Quatro novidades práticas: (1) calculadora Etanol × Gasolina (menu da conta) que diz na hora qual compensa abastecer; (2) Relatórios ganharam o card "Custo por Km" e o gráfico "Para Onde Vai o Dinheiro" (combustível, manutenção e cada categoria de despesa); (3) quem tem 2+ veículos agora vê uma tabela comparando consumo, custo/km e gasto de cada um lado a lado; (4) o painel principal mostra a projeção de gasto do mês (mantendo o ritmo atual) e os Relatórios ganharam atalhos "Este mês / Últimos 30 dias / Este ano" pra não digitar as datas na mão.',
