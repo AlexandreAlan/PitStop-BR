@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.10.1';
+const APP_VERSION = '1.11.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.11.0',
+        'resumo'  => 'Novo card "Autonomia estimada" no painel principal: combinando a capacidade do tanque do veículo com sua última média de consumo, o app estima quantos km ainda dá pra rodar com o tanque cheio. Aparece automaticamente quando você cadastra a capacidade do tanque em Veículos.',
+    ],
     [
         'versao'  => '1.10.1',
         'resumo'  => 'Auditoria de segurança: corrigido um jeito de manipular o arquivo exportado em Relatórios (CSV) caso alguém colocasse um nome de veículo malicioso; adicionado limite de tentativas de login por IP (além do bloqueio por conta que já existia); fechado um jeito de descobrir se um e-mail tem conta pelo tempo de resposta da recuperação de senha; e reforçada a proteção contra adulteração dos arquivos carregados de fora (Bootstrap, ícones, gráficos) e contra ataques de downgrade de HTTPS. Sem mudança visível pro usuário.',
