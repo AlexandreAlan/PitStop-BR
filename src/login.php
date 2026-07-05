@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/config/bootstrap.php';
 
+const LOGIN_LIMITE_POR_HORA = 30;
+
 if (usuarioAtual() !== null) {
     header('Location: index.php');
     exit;
@@ -13,20 +15,34 @@ $email = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrfVerificarOuFalhar();
 
-    $email = trim((string) ($_POST['email'] ?? ''));
-    $senha = (string) ($_POST['senha'] ?? '');
+    // Bloqueio por conta (tentativas_falhas) protege só uma conta por vez —
+    // sem isso um IP conseguiria testar senhas contra muitas contas
+    // diferentes sem nunca ser barrado (credential stuffing).
+    $ipHash = hash('sha256', clienteIp());
+    $tentativasRecentes = $pdo->prepare(
+        'SELECT COUNT(*) FROM login_rate_limit WHERE ip_hash = :ip AND criado_em > (NOW() - INTERVAL 1 HOUR)'
+    );
+    $tentativasRecentes->execute([':ip' => $ipHash]);
 
-    $resultado = loginUsuario($pdo, $email, $senha);
-    if ($resultado['ok']) {
-        if (!empty($resultado['precisaVerificar'])) {
-            header('Location: verificar_email.php');
+    if ((int) $tentativasRecentes->fetchColumn() >= LOGIN_LIMITE_POR_HORA) {
+        $erros[] = 'Muitas tentativas de login por aqui. Tente novamente daqui a pouco.';
+    } else {
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $senha = (string) ($_POST['senha'] ?? '');
+
+        $resultado = loginUsuario($pdo, $email, $senha);
+        if ($resultado['ok']) {
+            if (!empty($resultado['precisaVerificar'])) {
+                header('Location: verificar_email.php');
+                exit;
+            }
+            header('Location: index.php');
             exit;
         }
-        header('Location: index.php');
-        exit;
-    }
 
-    $erros[] = $resultado['erro'];
+        $pdo->prepare('INSERT INTO login_rate_limit (ip_hash) VALUES (:ip)')->execute([':ip' => $ipHash]);
+        $erros[] = $resultado['erro'];
+    }
 }
 
 $tituloPagina = 'Entrar';

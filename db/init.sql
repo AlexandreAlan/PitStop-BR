@@ -85,6 +85,16 @@ CREATE TABLE IF NOT EXISTS redefinicao_rate_limit (
     INDEX idx_redefinicao_rate_limit_ip (ip_hash, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- O bloqueio em usuarios.tentativas_falhas protege só UMA conta por vez;
+-- sem isso, um IP conseguiria tentar senhas contra centenas de contas
+-- diferentes sem nunca ser freado (credential stuffing).
+CREATE TABLE IF NOT EXISTS login_rate_limit (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ip_hash CHAR(64) NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_login_rate_limit_ip (ip_hash, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS registros (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     veiculo_id INT UNSIGNED NOT NULL,
