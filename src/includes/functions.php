@@ -72,6 +72,77 @@ function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): 
 }
 
 /**
+ * Estatísticas de um veículo específico (gasto, km rodado, custo por km e
+ * consumo médio), respeitando um recorte opcional de período — usado na
+ * comparação entre veículos em relatorios.php. Sempre restrito aos veículos
+ * do usuário informado (o próprio ID do veículo já garante o filtro).
+ */
+function calcularEstatisticasVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, ?string $dataInicio, ?string $dataFim): array
+{
+    $filtroData = ($dataInicio !== null ? ' AND r.data >= :data_inicio' : '')
+        . ($dataFim !== null ? ' AND r.data <= :data_fim' : '');
+
+    $bind = function (PDOStatement $stmt) use ($usuarioId, $veiculoId, $dataInicio, $dataFim): void {
+        $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+        if ($dataInicio !== null) {
+            $stmt->bindValue(':data_inicio', $dataInicio);
+        }
+        if ($dataFim !== null) {
+            $stmt->bindValue(':data_fim', $dataFim);
+        }
+    };
+
+    $stmt = $pdo->prepare(
+        'SELECT COALESCE(SUM(r.valor_pago), 0) FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id' . $filtroData
+    );
+    $bind($stmt);
+    $stmt->execute();
+    $gasto = (float) $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        'SELECT COALESCE(SUM(GREATEST(km_atual - km_anterior, 0)), 0) FROM (
+            SELECT r.km_atual, LAG(r.km_atual) OVER (ORDER BY r.km_atual) AS km_anterior
+            FROM registros r
+            INNER JOIN veiculos v ON v.id = r.veiculo_id
+            WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id' . $filtroData . '
+         ) t WHERE km_anterior IS NOT NULL'
+    );
+    $bind($stmt);
+    $stmt->execute();
+    $kmRodado = (int) $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        'SELECT km_atual, litros, km_anterior FROM (
+            SELECT r.km_atual, r.litros, LAG(r.km_atual) OVER (ORDER BY r.km_atual) AS km_anterior
+            FROM registros r
+            INNER JOIN veiculos v ON v.id = r.veiculo_id
+            WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
+              AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL' . $filtroData . '
+         ) t WHERE km_anterior IS NOT NULL'
+    );
+    $bind($stmt);
+    $stmt->execute();
+    $consumos = [];
+    foreach ($stmt->fetchAll() as $linha) {
+        $kmTrecho = (int) $linha['km_atual'] - (int) $linha['km_anterior'];
+        $litros   = (float) $linha['litros'];
+        if ($kmTrecho > 0 && $litros > 0) {
+            $consumos[] = $kmTrecho / $litros;
+        }
+    }
+
+    return [
+        'gasto'         => $gasto,
+        'km_rodado'     => $kmRodado,
+        'custo_km'      => $kmRodado > 0 ? $gasto / $kmRodado : null,
+        'consumo_medio' => $consumos ? round(array_sum($consumos) / count($consumos), 1) : null,
+    ];
+}
+
+/**
  * Status de um lembrete de manutenção: 'vencido', 'proximo' ou 'ok'.
  * Lembrete por KM usa o km_atual_veiculo (maior km_atual já registrado pro
  * veículo); sem nenhum registro ainda, considera "ok" (não dá pra saber).

@@ -73,6 +73,19 @@ if (($_GET['formato'] ?? '') === 'csv') {
     exit;
 }
 
+// Comparação entre veículos: só faz sentido com 2+ veículos cadastrados.
+// Reusa o mesmo recorte de período dos filtros acima (não o de veículo, que
+// aqui é irrelevante — a comparação sempre olha todos os veículos).
+$comparacaoVeiculos = [];
+if (count($veiculos) > 1) {
+    foreach ($veiculos as $v) {
+        $comparacaoVeiculos[] = [
+            'veiculo' => $v,
+            'stats'   => calcularEstatisticasVeiculo($pdo, $usuario['id'], (int) $v['id'], $dataInicioFiltro, $dataFimFiltro),
+        ];
+    }
+}
+
 // Resumo: total gasto, gasto médio por dia, preço médio por litro
 $stmt = $pdo->prepare(
     'SELECT COALESCE(SUM(r.valor_pago), 0) AS total_gasto,
@@ -98,6 +111,26 @@ if ($resumo['primeira_data'] !== null) {
     $dias = (new DateTime($resumo['primeira_data']))->diff(new DateTime($resumo['ultima_data']))->days + 1;
     $gastoMedioDia = $totalGasto / max($dias, 1);
 }
+
+// Onde vai o dinheiro: agrupa o gasto por categoria (combustível, manutenção
+// e cada categoria de despesa), pra mostrar a distribuição num gráfico rosca.
+$stmt = $pdo->prepare(
+    "SELECT categoria, SUM(valor_pago) AS total FROM (
+        SELECT CASE r.tipo_registro
+                   WHEN 'Abastecimento' THEN 'Combustível'
+                   WHEN 'Manutencao' THEN 'Manutenção'
+                   ELSE COALESCE(r.categoria_despesa, 'Outro')
+               END AS categoria,
+               r.valor_pago
+        FROM registros r
+        INNER JOIN veiculos v ON v.id = r.veiculo_id
+        WHERE v.usuario_id = :usuario_id" . $filtroVeiculoSql . '
+     ) t
+     GROUP BY categoria ORDER BY total DESC'
+);
+$bind($stmt);
+$stmt->execute();
+$gastoPorCategoria = $stmt->fetchAll();
 
 // Gasto por mês
 $stmt = $pdo->prepare(
@@ -180,6 +213,13 @@ $labelsKmMes = array_map(static fn($k) => $k['mes'], $kmPorMes);
 $valoresKmMes = array_map(static fn($k) => (int) $k['km_rodado'], $kmPorMes);
 $labelsConsumo = array_map(static fn($c) => $c['data'], $consumo);
 $valoresConsumo = array_map(static fn($c) => $c['kml'], $consumo);
+$labelsCategorias = array_map(static fn($c) => $c['categoria'], $gastoPorCategoria);
+$valoresCategorias = array_map(static fn($c) => (float) $c['total'], $gastoPorCategoria);
+
+// Custo por km: total gasto (no período/filtro) dividido pelo km total rodado
+// no mesmo recorte (soma do km rodado por mês, já calculado acima).
+$totalKmRodado = array_sum($valoresKmMes);
+$custoPorKm = $totalKmRodado > 0 ? $totalGasto / $totalKmRodado : null;
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
 
@@ -201,14 +241,19 @@ require __DIR__ . '/includes/header.php';
         </select>
     </div>
     <?php endif; ?>
+    <div class="d-flex gap-2 mb-2 atalhos-periodo">
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="mes">Este mês</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="30dias">Últimos 30 dias</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="ano">Este ano</button>
+    </div>
     <div class="row gx-2">
         <div class="col-6">
             <label class="form-label small text-muted mb-1">De</label>
-            <input type="date" name="data_inicio" class="form-control" value="<?= h((string) $dataInicioFiltro) ?>">
+            <input type="date" name="data_inicio" id="campoDataInicio" class="form-control" value="<?= h((string) $dataInicioFiltro) ?>">
         </div>
         <div class="col-6">
             <label class="form-label small text-muted mb-1">Até</label>
-            <input type="date" name="data_fim" class="form-control" value="<?= h((string) $dataFimFiltro) ?>">
+            <input type="date" name="data_fim" id="campoDataFim" class="form-control" value="<?= h((string) $dataFimFiltro) ?>">
         </div>
     </div>
     <div class="d-flex gap-2 mt-2">
@@ -225,7 +270,7 @@ require __DIR__ . '/includes/header.php';
 </form>
 
 <div class="row gx-2 px-1 mb-3">
-    <div class="col-4">
+    <div class="col-6">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <span class="icone-chip icone-chip-laranja mb-2" aria-hidden="true"><i class="bi bi-cash-stack"></i></span>
@@ -234,7 +279,16 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
-    <div class="col-4">
+    <div class="col-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
+                <p class="text-muted small mb-1">Custo por Km</p>
+                <p class="fw-bold mb-0 small stat-valor"><?= $custoPorKm !== null ? h(formatarMoeda($custoPorKm)) . '/km' : '—' ?></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-calendar3"></i></span>
@@ -243,7 +297,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
-    <div class="col-4">
+    <div class="col-6">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
                 <span class="icone-chip icone-chip-laranja mb-2" aria-hidden="true"><i class="bi bi-fuel-pump"></i></span>
@@ -270,6 +324,15 @@ require __DIR__ . '/includes/header.php';
             <div class="estado-vazio-mini"><i class="bi bi-signpost-split" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
         <?php else: ?>
             <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoKmMes" height="180"></canvas></div></div>
+        <?php endif; ?>
+    </div>
+
+    <div class="col-lg-6 px-1 mb-4">
+        <h6 class="text-muted mb-2">Para Onde Vai o Dinheiro</h6>
+        <?php if (!$gastoPorCategoria): ?>
+            <div class="estado-vazio-mini"><i class="bi bi-pie-chart" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
+        <?php else: ?>
+            <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoCategorias" height="180"></canvas></div></div>
         <?php endif; ?>
     </div>
 </div>
@@ -311,6 +374,46 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($comparacaoVeiculos): ?>
+<div class="px-1 mb-4">
+    <h6 class="text-muted mb-2">Comparação entre Veículos</h6>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0" style="overflow-x: auto;">
+            <table class="table table-sm mb-0 align-middle text-center">
+                <thead>
+                    <tr>
+                        <th class="text-start ps-3">&nbsp;</th>
+                        <?php foreach ($comparacaoVeiculos as $c): ?>
+                        <th class="small"><?= h($c['veiculo']['nome']) ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-start ps-3 small text-muted">Consumo médio</td>
+                        <?php foreach ($comparacaoVeiculos as $c): ?>
+                        <td class="small fw-semibold"><?= $c['stats']['consumo_medio'] !== null ? h(number_format($c['stats']['consumo_medio'], 1, ',', '.')) . ' km/l' : '—' ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+                    <tr>
+                        <td class="text-start ps-3 small text-muted">Custo por km</td>
+                        <?php foreach ($comparacaoVeiculos as $c): ?>
+                        <td class="small fw-semibold"><?= $c['stats']['custo_km'] !== null ? h(formatarMoeda($c['stats']['custo_km'])) : '—' ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+                    <tr>
+                        <td class="text-start ps-3 small text-muted">Gasto no período</td>
+                        <?php foreach ($comparacaoVeiculos as $c): ?>
+                        <td class="small fw-semibold"><?= h(formatarMoeda($c['stats']['gasto'])) ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="px-1 mb-4">
     <h6 class="text-muted mb-2">Evolução do Consumo (km/l)</h6>
     <?php if (!$consumo): ?>
@@ -323,9 +426,10 @@ require __DIR__ . '/includes/header.php';
 <script src="assets/js/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="application/json" id="dados-relatorios"><?= json_encode([
-    'gastoMes' => ['labels' => $labelsGastoMes, 'valores' => $valoresGastoMes],
-    'kmMes'    => ['labels' => $labelsKmMes, 'valores' => $valoresKmMes],
-    'consumo'  => ['labels' => $labelsConsumo, 'valores' => $valoresConsumo],
+    'gastoMes'    => ['labels' => $labelsGastoMes, 'valores' => $valoresGastoMes],
+    'kmMes'       => ['labels' => $labelsKmMes, 'valores' => $valoresKmMes],
+    'consumo'     => ['labels' => $labelsConsumo, 'valores' => $valoresConsumo],
+    'categorias'  => ['labels' => $labelsCategorias, 'valores' => $valoresCategorias],
 ], $jsonFlags) ?></script>
 <script src="assets/js/relatorios.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
