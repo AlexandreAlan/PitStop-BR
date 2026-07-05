@@ -6,6 +6,7 @@ const AUTH_BLOQUEIO_MINUTOS = 15;
 const AUTH_SENHA_MIN = 8;
 const AUTH_CODIGO_VALIDADE_MINUTOS = 15;
 const AUTH_CODIGO_MAX_TENTATIVAS = 5;
+const AUTH_RESET_VALIDADE_MINUTOS = 60;
 
 function usuarioAtual(): ?array
 {
@@ -182,6 +183,69 @@ function loginUsuario(PDO $pdo, string $email, string $senha): array
     $_SESSION['usuario_role'] = $usuario['role'];
 
     return ['ok' => true];
+}
+
+/**
+ * Gera um token de redefinição de senha (só o hash é guardado, igual ao
+ * convite). Tokens pendentes anteriores do mesmo usuário são invalidados —
+ * só o link mais recente enviado por e-mail funciona.
+ */
+function gerarTokenRedefinicaoSenha(PDO $pdo, int $usuarioId): string
+{
+    $token     = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+    $expiraEm  = (new DateTime())->modify('+' . AUTH_RESET_VALIDADE_MINUTOS . ' minutes')->format('Y-m-d H:i:s');
+
+    $pdo->prepare('DELETE FROM redefinicoes_senha WHERE usuario_id = :id')->execute([':id' => $usuarioId]);
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO redefinicoes_senha (usuario_id, token_hash, expira_em) VALUES (:usuario_id, :token_hash, :expira_em)'
+    );
+    $stmt->execute([
+        ':usuario_id' => $usuarioId,
+        ':token_hash' => $tokenHash,
+        ':expira_em'  => $expiraEm,
+    ]);
+
+    return $token;
+}
+
+function redefinirSenhaComToken(PDO $pdo, string $token, string $novaSenha): array
+{
+    if (mb_strlen($novaSenha) < AUTH_SENHA_MIN) {
+        return ['ok' => false, 'erro' => 'A senha precisa ter pelo menos ' . AUTH_SENHA_MIN . ' caracteres.'];
+    }
+
+    $tokenHash = hash('sha256', $token);
+
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare(
+            'SELECT id, usuario_id FROM redefinicoes_senha
+             WHERE token_hash = :token_hash AND usado_em IS NULL AND expira_em > NOW() FOR UPDATE'
+        );
+        $lock->execute([':token_hash' => $tokenHash]);
+        $registro = $lock->fetch();
+
+        if (!$registro) {
+            $pdo->rollBack();
+            return ['ok' => false, 'erro' => 'Este link é inválido, já foi usado ou expirou.'];
+        }
+
+        $hash = password_hash($novaSenha, PASSWORD_DEFAULT);
+        $pdo->prepare('UPDATE usuarios SET senha_hash = :hash, tentativas_falhas = 0, bloqueado_ate = NULL WHERE id = :id')
+            ->execute([':hash' => $hash, ':id' => $registro['usuario_id']]);
+        $pdo->prepare('UPDATE redefinicoes_senha SET usado_em = NOW() WHERE id = :id')
+            ->execute([':id' => $registro['id']]);
+
+        $pdo->commit();
+        return ['ok' => true];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
 }
 
 function logoutUsuario(): void

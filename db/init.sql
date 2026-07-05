@@ -63,6 +63,28 @@ CREATE TABLE IF NOT EXISTS convites (
     INDEX idx_convites_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS redefinicoes_senha (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT UNSIGNED NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expira_em DATETIME NOT NULL,
+    usado_em DATETIME NULL,
+    CONSTRAINT fk_redefinicoes_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_redefinicoes_token_hash (token_hash),
+    INDEX idx_redefinicoes_usuario (usuario_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS redefinicao_rate_limit (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ip_hash CHAR(64) NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_redefinicao_rate_limit_ip (ip_hash, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS registros (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     veiculo_id INT UNSIGNED NOT NULL,
