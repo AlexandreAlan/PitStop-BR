@@ -12,6 +12,20 @@ $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?:
 
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 
+// Autonomia estimada (tanque x consumo médio): só faz sentido quando dá pra
+// saber de qual veículo é o tanque — um veículo específico filtrado, ou o
+// único que o usuário tem (sem essa certeza, misturar tanques não diz nada).
+$veiculoParaAutonomia = $veiculoIdFiltro ?? (count($veiculos) === 1 ? (int) $veiculos[0]['id'] : null);
+$autonomiaKm = null;
+if ($veiculoParaAutonomia !== null && $ultimaMedia !== null) {
+    $tanqueStmt = $pdo->prepare('SELECT tanque_litros FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+    $tanqueStmt->execute([':id' => $veiculoParaAutonomia, ':usuario_id' => $usuario['id']]);
+    $tanqueLitros = $tanqueStmt->fetchColumn();
+    if ($tanqueLitros !== false && $tanqueLitros !== null) {
+        $autonomiaKm = (int) round((float) $tanqueLitros * $ultimaMedia);
+    }
+}
+
 $lembretesStmt = $pdo->prepare(
     "SELECT l.descricao, l.tipo_alvo, l.km_alvo, l.data_alvo,
             (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
@@ -91,6 +105,17 @@ require __DIR__ . '/includes/header.php';
         <?php else: ?>
         <h2 class="display-6 fw-bold text-success mb-0"><i class="bi bi-speedometer2 me-1"></i>Sem dados</h2>
         <?php endif; ?>
+
+        <?php if ($autonomiaKm !== null): ?>
+        <div class="gasto-mes-linha mt-2">
+            <span class="icone-chip icone-chip-teal" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
+            <span class="text-start">
+                <span class="text-muted small d-block">Autonomia estimada</span>
+                <span class="valor-destaque">~<?= h(number_format($autonomiaKm, 0, ',', '.')) ?> km</span>
+            </span>
+        </div>
+        <?php endif; ?>
+
         <div class="gasto-mes-linha">
             <span class="icone-chip icone-chip-laranja" aria-hidden="true"><i class="bi bi-cash-coin"></i></span>
             <span class="text-start">
