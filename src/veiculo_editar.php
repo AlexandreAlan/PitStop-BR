@@ -131,9 +131,9 @@ require __DIR__ . '/includes/header.php';
     <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
     <input type="hidden" name="id" value="<?= (int) $id ?>">
 
-    <div class="mb-3">
+    <div class="mb-3 position-relative">
         <label class="form-label">Nome</label>
-        <input type="text" name="nome" maxlength="100" class="form-control form-control-lg" value="<?= h($nome) ?>" required>
+        <input type="text" id="nome" name="nome" maxlength="100" class="form-control form-control-lg" value="<?= h($nome) ?>" autocomplete="off" required>
     </div>
 
     <div class="mb-3">

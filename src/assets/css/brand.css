@@ -126,6 +126,14 @@ body {
     justify-content: center;
     gap: .6rem;
     position: relative;
+    /* A animacao de entrada "ps-entrada" (mais abaixo) deixa um transform
+       parado no elemento apos terminar (fill-mode: both), o que cria um
+       stacking context novo aqui. Sem z-index explicito, esse contexto
+       "some" atras do main.container (que ganha o mesmo tipo de contexto
+       pela mesma animacao e vem depois no HTML) - e o dropdown da conta
+       (z-index 1000, mas preso dentro deste contexto) fica encoberto pelo
+       conteudo da pagina. */
+    z-index: 2;
 }
 
 .header-dark .voltar {
@@ -399,7 +407,7 @@ body {
     flex: 0 0 56px;
     width: 56px;
     height: 56px;
-    margin: 0 .35rem -18px;
+    margin: -18px .35rem 0;
     border-radius: 50%;
     background: var(--ps-primary);
     color: #fff;

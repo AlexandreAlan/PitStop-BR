@@ -151,9 +151,9 @@ require __DIR__ . '/includes/header.php';
 
     <h6 class="text-muted mb-3 px-1">Adicionar Veículo</h6>
 
-    <div class="mb-3">
+    <div class="mb-3 position-relative">
         <label class="form-label">Nome</label>
-        <input type="text" name="nome" maxlength="100" class="form-control form-control-lg" value="<?= h($nome) ?>" placeholder="Ex: Honda Bros 2020" required>
+        <input type="text" id="nome" name="nome" maxlength="100" class="form-control form-control-lg" value="<?= h($nome) ?>" placeholder="Ex: Honda Bros 2020" autocomplete="off" required>
     </div>
 
     <div class="mb-3">

@@ -15,9 +15,14 @@ document.addEventListener('DOMContentLoaded', function () {
  * "marca modelo ano" (ex.: "bros 160 2025") e autopreenche tanque/peso ao
  * escolher um resultado — sem travar o formulário se não achar nada, os
  * campos continuam editáveis à mão.
+ *
+ * Liga tanto no campo "Buscar modelo" quanto no "Nome" (mesmo placeholder
+ * "Ex: Honda Bros 2020" convida a digitar o modelo ali) - quem digitar o
+ * modelo em qualquer um dos dois ve as sugestoes e ganha o autopreenchimento.
  */
 function inicializarBuscaModelo() {
     const campoBusca = document.getElementById('buscaModelo');
+    const campoNome = document.getElementById('nome');
     if (!campoBusca) return;
 
     const lista = document.getElementById('buscaModeloResultados');
@@ -26,25 +31,33 @@ function inicializarBuscaModelo() {
     const campoPeso = document.getElementById('pesoKg');
     let ultimoController = null;
     let timeoutId = null;
+    let campoOrigem = campoBusca;
 
-    campoBusca.addEventListener('input', function () {
-        // Digitou de novo depois de já ter escolhido um modelo: descarta o
-        // vínculo antigo (autopreenchimento passa a valer só pra escolha nova).
-        campoModeloId.value = '';
+    function ligarCampo(campo) {
+        if (!campo) return;
+        campo.addEventListener('input', function () {
+            campoOrigem = campo;
+            // Digitou de novo depois de já ter escolhido um modelo: descarta o
+            // vínculo antigo (autopreenchimento passa a valer só pra escolha nova).
+            campoModeloId.value = '';
 
-        const termo = campoBusca.value.trim();
-        clearTimeout(timeoutId);
-        if (termo.length < 2) {
-            lista.classList.add('d-none');
-            lista.innerHTML = '';
-            return;
-        }
+            const termo = campo.value.trim();
+            clearTimeout(timeoutId);
+            if (termo.length < 2) {
+                lista.classList.add('d-none');
+                lista.innerHTML = '';
+                return;
+            }
 
-        timeoutId = setTimeout(function () { buscar(termo); }, 300);
-    });
+            timeoutId = setTimeout(function () { buscar(termo); }, 300);
+        });
+    }
+
+    ligarCampo(campoBusca);
+    ligarCampo(campoNome);
 
     document.addEventListener('click', function (evento) {
-        if (evento.target !== campoBusca && !lista.contains(evento.target)) {
+        if (evento.target !== campoBusca && evento.target !== campoNome && !lista.contains(evento.target)) {
             lista.classList.add('d-none');
         }
     });
@@ -74,6 +87,11 @@ function inicializarBuscaModelo() {
             return;
         }
 
+        // A lista de sugestoes acompanha o campo que disparou a busca (Nome
+        // ou Buscar modelo) - ambos tem um wrapper "position-relative" pra
+        // ela se ancorar embaixo do campo certo.
+        campoOrigem.insertAdjacentElement('afterend', lista);
+
         lista.innerHTML = resultados.map(function (r) {
             const periodo = r.ano_fim ? (r.ano_inicio + '–' + r.ano_fim) : (r.ano_inicio + '+');
             return '<button type="button" class="list-group-item list-group-item-action busca-modelo-item" ' +
@@ -89,7 +107,9 @@ function inicializarBuscaModelo() {
 
         lista.querySelectorAll('.busca-modelo-item').forEach(function (item) {
             item.addEventListener('click', function () {
-                campoBusca.value = item.getAttribute('data-label');
+                const label = item.getAttribute('data-label');
+                campoBusca.value = label;
+                if (campoNome && !campoNome.value) campoNome.value = label;
                 campoModeloId.value = item.getAttribute('data-id');
                 const tanque = item.getAttribute('data-tanque');
                 const peso = item.getAttribute('data-peso');
