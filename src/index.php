@@ -11,6 +11,7 @@ $veiculos = $veiculosStmt->fetchAll();
 $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?: null;
 
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
+$conquistas = calcularConquistas($pdo, $usuario['id']);
 
 // Autonomia estimada (tanque x consumo médio): só faz sentido quando dá pra
 // saber de qual veículo é o tanque — um veículo específico filtrado, ou o
@@ -157,6 +158,33 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($conquistas['totalAbastecimentos'] > 0): ?>
+<div class="card card-resumo card-conquistas">
+    <div class="card-body py-3">
+        <?php if ($conquistas['sequenciaMeses'] >= 2): ?>
+        <p class="text-center mb-2 conquistas-sequencia">
+            <i class="bi bi-fire"></i> <?= (int) $conquistas['sequenciaMeses'] ?> meses seguidos registrando
+        </p>
+        <?php endif; ?>
+        <div class="conquistas-linha">
+            <?php foreach ($conquistas['badges'] as $b): ?>
+            <span class="badge-conquista <?= $b['conquistada'] ? 'conquistada' : '' ?>" title="<?= h($b['titulo']) ?>">
+                <i class="bi <?= h($b['icone']) ?>" aria-hidden="true"></i>
+                <span class="badge-conquista-titulo"><?= h($b['titulo']) ?></span>
+            </span>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($conquistas['proximoMarco'] !== null):
+            $faltam = $conquistas['proximoMarco']['qtd'] - $conquistas['totalAbastecimentos'];
+        ?>
+        <p class="text-muted small text-center mb-0 mt-2">
+            Faltam <strong><?= $faltam ?></strong> abastecimento<?= $faltam === 1 ? '' : 's' ?> pra "<?= h($conquistas['proximoMarco']['titulo']) ?>"
+        </p>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <a href="combustivel.php" class="d-flex align-items-center gap-2 mx-1 mb-3 text-decoration-none atalho-ferramenta">
     <span class="icone-chip icone-chip-teal" aria-hidden="true"><i class="bi bi-fuel-pump"></i></span>

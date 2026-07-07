@@ -188,6 +188,108 @@ function calcularStatusLembrete(array $lembrete): array
     return ['status' => $status, 'rotulo' => $rotulos[$status][0], 'classe' => $rotulos[$status][1]];
 }
 
+/**
+ * Sequência (streak) de meses consecutivos com pelo menos 1 registro, e um
+ * conjunto de conquistas por marco (abastecimentos registrados, consumo em
+ * melhora no mês, manutenção em dia). Tudo calculado na hora a partir de
+ * registros/lembretes existentes — não guarda estado próprio, então nunca
+ * fica desatualizado.
+ */
+function calcularConquistas(PDO $pdo, int $usuarioId): array
+{
+    // Sequência de meses: conta pra trás a partir do mês atual (ou do último
+    // mês com registro, se o mês corrente ainda estiver zerado — não
+    // "quebra" a sequência só porque o mês acabou de começar).
+    $mesesStmt = $pdo->prepare(
+        "SELECT DISTINCT DATE_FORMAT(r.data, '%Y-%m') AS mes
+         FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id"
+    );
+    $mesesStmt->execute([':usuario_id' => $usuarioId]);
+    $mesesComRegistro = array_column($mesesStmt->fetchAll(), 'mes');
+
+    $sequenciaMeses = 0;
+    $cursor = new DateTime('first day of this month');
+    if (!in_array($cursor->format('Y-m'), $mesesComRegistro, true)) {
+        $cursor->modify('-1 month');
+    }
+    while (in_array($cursor->format('Y-m'), $mesesComRegistro, true)) {
+        $sequenciaMeses++;
+        $cursor->modify('-1 month');
+    }
+
+    // Total de abastecimentos — base dos marcos de quilometragem percorrida.
+    $totalStmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND r.tipo_registro = 'Abastecimento'"
+    );
+    $totalStmt->execute([':usuario_id' => $usuarioId]);
+    $totalAbastecimentos = (int) $totalStmt->fetchColumn();
+
+    // Consumo médio do mês atual x mês anterior (só entre abastecimentos
+    // consecutivos do MESMO veículo) — melhora vira a conquista "Economia do Mês".
+    $consumoStmt = $pdo->prepare(
+        "SELECT mes, AVG((km_atual - km_anterior) / litros) AS consumo_medio FROM (
+            SELECT DATE_FORMAT(r.data, '%Y-%m') AS mes, r.km_atual, r.litros,
+                   LAG(r.km_atual) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual) AS km_anterior
+            FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
+            WHERE v.usuario_id = :usuario_id
+              AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL
+         ) t
+         WHERE km_anterior IS NOT NULL AND km_atual > km_anterior
+         GROUP BY mes ORDER BY mes DESC LIMIT 2"
+    );
+    $consumoStmt->execute([':usuario_id' => $usuarioId]);
+    $consumoPorMes = $consumoStmt->fetchAll();
+    $mesAtual = (new DateTime('today'))->format('Y-m');
+    $economiaMes = count($consumoPorMes) === 2
+        && $consumoPorMes[0]['mes'] === $mesAtual
+        && (float) $consumoPorMes[0]['consumo_medio'] > (float) $consumoPorMes[1]['consumo_medio'];
+
+    // Manutenção em dia: existe ao menos 1 lembrete ativo e nenhum vencido.
+    $lembretesStmt = $pdo->prepare(
+        "SELECT l.tipo_alvo, l.km_alvo, l.data_alvo,
+                (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
+         FROM lembretes l INNER JOIN veiculos v ON v.id = l.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND l.concluido_em IS NULL"
+    );
+    $lembretesStmt->execute([':usuario_id' => $usuarioId]);
+    $lembretesAtivos = $lembretesStmt->fetchAll();
+    $temLembreteVencido = false;
+    foreach ($lembretesAtivos as $l) {
+        if (calcularStatusLembrete($l)['status'] === 'vencido') {
+            $temLembreteVencido = true;
+            break;
+        }
+    }
+    $emDia = count($lembretesAtivos) > 0 && !$temLembreteVencido;
+
+    $marcos = [1 => 'Primeira Carga', 10 => '10 Abastecimentos', 25 => '25 Abastecimentos',
+               50 => '50 Abastecimentos', 100 => 'Motorista Veterano'];
+    $proximoMarco = null;
+    foreach ($marcos as $qtd => $titulo) {
+        if ($totalAbastecimentos < $qtd) { $proximoMarco = ['qtd' => $qtd, 'titulo' => $titulo]; break; }
+    }
+
+    return [
+        'sequenciaMeses' => $sequenciaMeses,
+        'proximoMarco' => $proximoMarco,
+        'totalAbastecimentos' => $totalAbastecimentos,
+        'badges' => [
+            ['codigo' => 'primeira_carga', 'titulo' => 'Primeira Carga', 'icone' => 'bi-fuel-pump-fill',
+                'conquistada' => $totalAbastecimentos >= 1],
+            ['codigo' => 'dez_abastecimentos', 'titulo' => '10 Abastecimentos', 'icone' => 'bi-award-fill',
+                'conquistada' => $totalAbastecimentos >= 10],
+            ['codigo' => 'cinquenta_abastecimentos', 'titulo' => 'Motorista Veterano', 'icone' => 'bi-trophy-fill',
+                'conquistada' => $totalAbastecimentos >= 50],
+            ['codigo' => 'economia_mes', 'titulo' => 'Economia do Mês', 'icone' => 'bi-graph-down-arrow',
+                'conquistada' => $economiaMes],
+            ['codigo' => 'em_dia', 'titulo' => 'Manutenção em Dia', 'icone' => 'bi-patch-check-fill',
+                'conquistada' => $emDia],
+        ],
+    ];
+}
+
 const COMBUSTIVEIS_PERMITIDOS = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
 const CATEGORIAS_DESPESA_PERMITIDAS = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
 

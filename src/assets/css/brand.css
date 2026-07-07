@@ -234,6 +234,67 @@ body {
 .meta-mensal-estourada.meta-mensal-percentual { color: var(--ps-danger); }
 .meta-mensal-estourada.meta-mensal-progresso { background: var(--ps-danger); }
 
+/* Conquistas (gamificação) — sequência de meses registrando + marcos de uso.
+   Selos discretos em cinza quando bloqueados, ganham cor sólida (mesma
+   linguagem visual do .icone-chip) só quando conquistados. */
+.card-conquistas {
+    margin-top: -.25rem;
+}
+
+.conquistas-sequencia {
+    font-weight: 700;
+    color: var(--ps-primary-dark);
+}
+
+.conquistas-sequencia .bi-fire {
+    color: var(--ps-primary);
+}
+
+.conquistas-linha {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: .6rem;
+}
+
+.badge-conquista {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    width: 68px;
+}
+
+.badge-conquista i {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    background: rgba(var(--ps-shadow-rgb), .06);
+    color: rgba(var(--ps-shadow-rgb), .3);
+}
+
+.badge-conquista.conquistada i {
+    background: var(--ps-primary);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(var(--ps-primary-rgb), .35);
+}
+
+.badge-conquista-titulo {
+    font-size: .65rem;
+    text-align: center;
+    line-height: 1.15;
+    color: rgba(var(--ps-shadow-rgb), .45);
+}
+
+.badge-conquista.conquistada .badge-conquista-titulo {
+    color: var(--ps-ink);
+    font-weight: 600;
+}
+
 /* Atalho de ferramenta (ex.: Etanol x Gasolina) no dashboard — link discreto
    com o mesmo selo de ícone das estatísticas, não compete com os cards. */
 .atalho-ferramenta {
