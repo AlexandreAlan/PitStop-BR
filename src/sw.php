@@ -210,3 +210,43 @@ self.addEventListener('sync', function (event) {
         event.waitUntil(self.PitstopOutbox.sincronizarFila());
     }
 });
+
+// Notificação push de lembrete (ver cron/enviar_lembretes_push.php no
+// servidor) — o payload já vem pronto (título/corpo/url), o SW só exibe.
+self.addEventListener('push', function (event) {
+    let dados = { titulo: 'PitStop BR', corpo: 'Você tem um lembrete pendente.', url: '/lembretes.php' };
+    if (event.data) {
+        try { dados = Object.assign(dados, event.data.json()); } catch (erro) { /* payload não-JSON: usa o texto puro como corpo */
+            dados.corpo = event.data.text();
+        }
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(dados.titulo, {
+            body: dados.corpo,
+            icon: '/assets/img/icon-192.png',
+            badge: '/assets/img/icon-192.png',
+            data: { url: dados.url },
+        })
+    );
+});
+
+// Clique na notificação: foca uma aba já aberta na URL do lembrete, ou abre
+// uma nova se não houver nenhuma.
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    const url = (event.notification.data && event.notification.data.url) || '/lembretes.php';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (janelas) {
+            for (const janela of janelas) {
+                if (new URL(janela.url).pathname === url && 'focus' in janela) {
+                    return janela.focus();
+                }
+            }
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(url);
+            }
+        })
+    );
+});

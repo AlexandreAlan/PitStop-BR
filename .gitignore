@@ -26,3 +26,6 @@ twa-manifest.json
 
 # APK gerado é publicado em src/downloads/, não versionado (binário grande)
 src/downloads/*.apk
+
+# Dependências PHP (Composer) — geradas por scripts/composer-install.sh
+src/vendor/

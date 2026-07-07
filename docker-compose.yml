@@ -19,6 +19,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     depends_on:
       db:
         condition: service_healthy
@@ -44,6 +47,45 @@ services:
         limits:
           cpus: "0.50"
           memory: 256M
+
+  # Roda cron/enviar_lembretes_push.php de hora em hora: manda notificação
+  # push (Web Push) pra quem tem lembrete vencendo/vencido, mesmo com o app
+  # fechado. Mesma imagem do "web", sem servir HTTP nenhum (sem ports).
+  cron:
+    build:
+      context: ./docker/php
+    container_name: pitstop_cron
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; sleep 3600; done"
+    volumes:
+      - ./src:/var/www/html:ro
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASS: ${MYSQL_PASSWORD}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - pitstop_net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
 
   db:
     image: mysql:8.0

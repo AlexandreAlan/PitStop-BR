@@ -107,6 +107,23 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php $vapidPublicKey = (string) (getenv('VAPID_PUBLIC_KEY') ?: ''); ?>
+<?php if ($vapidPublicKey !== ''): ?>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <h6 class="text-muted mb-1"><i class="bi bi-bell me-1"></i>Notificações</h6>
+        <p class="small text-muted mb-3">Receba um aviso no celular quando um lembrete de manutenção
+        vencer ou estiver próximo — mesmo com o app fechado.</p>
+
+        <button type="button" id="btnPushToggle" class="btn btn-primary w-100"
+            data-vapid="<?= h($vapidPublicKey) ?>" data-csrf="<?= h(csrfToken()) ?>">
+            Ativar notificações de lembretes
+        </button>
+    </div>
+</div>
+<script src="assets/js/push.js"></script>
+<?php endif; ?>
+
 <div class="card shadow-sm border-0 border-danger-subtle">
     <div class="card-body p-4">
         <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Excluir Conta</h6>

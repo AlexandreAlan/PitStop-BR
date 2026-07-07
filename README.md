@@ -31,7 +31,8 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
   Comum/Aditivada, Etanol, Diesel, GNV ou Outro), manutenções (km, valor, descrição) e despesas
   (Seguro, IPVA, Estacionamento, Pedágio, Multa, Lavagem ou Outro)
 - Lembretes de manutenção/documentos por km ou por data (ex.: troca de óleo aos 40.000km, seguro
-  vencendo em uma data), com status Vencido/Próximo/Em dia e alerta no painel principal
+  vencendo em uma data), com status Vencido/Próximo/Em dia, alerta no painel principal e
+  **notificação push** (Minha Conta → Notificações) avisando mesmo com o app fechado
 - Conquistas (gamificação): sequência de meses seguidos registrando, e selos por marco —
   Primeira Carga, 10 Abastecimentos, Motorista Veterano (50), Economia do Mês (consumo médio
   melhor que o mês anterior) e Manutenção em Dia — calculados na hora a partir dos próprios dados,
@@ -70,6 +71,7 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - **Backend:** PHP 8.2 puro (sem framework), Apache
 - **Banco:** MySQL 8.0, acesso exclusivo via PDO (prepared statements)
 - **E-mail:** cliente SMTP próprio em PHP puro (sem dependências), usado pro envio de convites
+- **Notificações push:** [minishlink/web-push](https://github.com/web-push-libs/web-push-php) (única dependência via Composer do projeto — VAPID + criptografia do payload são delicados demais pra reinventar na mão) rodando num serviço `cron` dedicado
 - **App Android:** TWA (Trusted Web Activity) gerado com Bubblewrap, assinado com keystore próprio
 - **Infra:** Docker Compose (build próprio da imagem PHP+Apache hardenizada)
 
@@ -174,10 +176,29 @@ Sem essas variáveis, o convite continua sendo gerado no banco normalmente, mas 
 enviado (fica registrado em log). O cliente SMTP é caseiro (sem dependências externas), suporta
 TLS implícito (porta 465) ou STARTTLS (porta 587) com `AUTH LOGIN`.
 
+## Configuração de notificações push (VAPID)
+
+Pra ativar a notificação push dos lembretes, gere um par de chaves VAPID (uma vez só, por
+ambiente) e defina no `.env`:
+
+```bash
+docker run --rm -v "$(pwd)/src:/app" -w /app composer:2 exec vendor/bin/web-push-vapid-gen
+```
+
+```
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:contato@seudominio.com.br
+```
+
+Sem essas variáveis, o botão "Ativar notificações" some de Minha Conta e o serviço `cron` só fica
+registrando os lembretes vencidos sem enviar nada (nenhum erro, só não notifica).
+
 ## Como rodar
 
 ```bash
 cd pitstop-br
+scripts/composer-install.sh   # instala src/vendor/ (dependências PHP) via Docker — só na 1ª vez ou quando composer.json mudar
 docker compose up -d --build
 ```
 
@@ -187,6 +208,7 @@ App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS 
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.13.0 | 2026-07-05 | Notificações push (Web Push) dos lembretes: `push_inscrever.php`/`push_desinscrever.php` guardam a inscrição do navegador (`push_inscricoes`, deduplicada por hash do endpoint); `sw.php` ganha os handlers `push`/`notificationclick`; novo serviço `cron` (mesma imagem do `web`, sem HTTP) roda `cron/enviar_lembretes_push.php` de hora em hora, manda um push por lembrete vencido/próximo (uma vez só por lembrete, via `lembretes.push_notificado_em`) e some sozinho com inscrições expiradas que o push service reportar. Primeira dependência via Composer do projeto (`minishlink/web-push`, MIT) — VAPID + criptografia do payload são coisa demais pra reinventar na mão; `src/vendor/` fica de fora do Git (`scripts/composer-install.sh` gera via Docker, sem exigir Composer no host). Toggle em Minha Conta só aparece com VAPID configurado. Testado ponta a ponta: geração de chaves VAPID na imagem da própria app, biblioteca carregando via autoload, e a função de envio/limpeza de inscrição expirada revisada linha a linha (sem servidor de push real disponível no ambiente de teste pra disparar uma notificação de verdade) |
 | 1.12.0 | 2026-07-05 | Conquistas (gamificação) no painel principal: sequência de meses seguidos com registro, e 5 selos por marco (Primeira Carga, 10 Abastecimentos, Motorista Veterano, Economia do Mês, Manutenção em Dia), com progresso pro próximo selo. Tudo calculado na hora (`calcularConquistas()` em `functions.php`) a partir de `registros`/`lembretes` que já existiam — sem tabela nova, sem estado próprio pra desatualizar. Testado com dados sintéticos num MySQL isolado e descartável (sequência normal, sequência quebrada por mês sem registro, lembrete vencido derrubando o selo "Em Dia") — nenhum dado real de usuário foi lido ou alterado |
 | 1.11.0 | 2026-07-05 | Autonomia estimada do tanque no painel principal: `tanque_litros` do veículo (já existia no cadastro, nunca usado em cálculo nenhum) multiplicado pela última média de consumo (`calcularUltimaMedia()`). Só exibido quando o veículo em contexto é inequívoco (filtro de veículo ativo, ou usuário com um único veículo cadastrado) e há tanto tanque quanto consumo calculável. Testado em produção com dados temporários (tanque + segundo abastecimento no mesmo veículo), removidos ao final |
 | 1.10.1 | 2026-07-05 | Auditoria de segurança completa (leitura de todo o código-fonte): (1) **CSV Injection** — nome de veículo/descrição iam crus no CSV exportado em Relatórios; nova `sanitizarCelulaCsv()` em `functions.php` prefixa com aspas simples qualquer célula que comece com `= + - @ tab CR`, neutralizando fórmula/DDE no Excel/LibreOffice; (2) **credential stuffing** — bloqueio existente (`tentativas_falhas`) protegia só uma conta por vez; nova tabela `login_rate_limit` (mesmo padrão de `cadastro_rate_limit`) limita a 30 tentativas falhas/hora por IP em `login.php`; (3) **vazamento de e-mail por timing** — em `esqueci_senha.php`, o caminho "conta existe" (gera token + SMTP real) demorava visivelmente mais que "não existe" (só um SELECT), driblando a mensagem genérica; atraso artificial de 300–700ms equaliza os dois; (4) **supply-chain** — Bootstrap/Bootstrap Icons/Chart.js carregados do jsDelivr sem verificação; adicionado SRI (hash sha384 calculado do conteúdo real, verificado sem quebrar nada) + `crossorigin="anonymous"`; (5) **HSTS ausente** — `docker/php/security.conf` ganha `Strict-Transport-Security`, fechando a janela de downgrade na primeira visita antes do redirect do nginx (exigiu rebuild da imagem, `security.conf` não é bind-mount). IDOR, CSRF, SQLi (queries sempre parametrizadas, `EMULATE_PREPARES` off), sessão (regenerate_id, cookies `Secure/HttpOnly/SameSite=Strict`), hardening de Docker (`read_only`, `cap_drop: ALL`, DB sem porta exposta) e `.env`/segredos revisados — nenhum problema encontrado nessas frentes |

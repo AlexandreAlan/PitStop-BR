@@ -1,0 +1,13 @@
+{
+    "name": "pitstop-br/pitstop-br",
+    "description": "PitStop BR — dependências mínimas (só o necessário pra Web Push).",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "minishlink/web-push": "^9.0"
+    },
+    "config": {
+        "platform": { "php": "8.2" },
+        "sort-packages": true
+    }
+}
