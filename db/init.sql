@@ -1,11 +1,24 @@
+-- Este arquivo roda uma vez só, quando o volume do MySQL é criado do zero
+-- (docker-entrypoint-initdb.d) — não é reaplicado num banco que já existe.
+-- `role`/`email_verificado_em` (usuarios), `client_uuid` (registros/lembretes)
+-- e a tabela `verificacoes_email`/`cadastro_rate_limit` foram reconciliados
+-- aqui nesta versão: já estavam em uso pelo código e aplicados em produção
+-- por fora deste arquivo (drift histórico), mas faltavam aqui — uma
+-- instalação nova a partir deste arquivo não subia o cadastro/login
+-- corretamente até essa correção.
+
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     email VARCHAR(190) NOT NULL,
     senha_hash VARCHAR(255) NOT NULL,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     tentativas_falhas TINYINT UNSIGNED NOT NULL DEFAULT 0,
     bloqueado_ate DATETIME NULL,
     aceite_privacidade_em DATETIME NULL,
+    -- NULL até o cadastro público (com verificação por código de 6 dígitos)
+    -- confirmar o e-mail; contas criadas por convite já entram confirmadas.
+    email_verificado_em DATETIME NULL,
     meta_mensal DECIMAL(10,2) NULL,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_usuarios_email (email)
@@ -95,6 +108,30 @@ CREATE TABLE IF NOT EXISTS login_rate_limit (
     INDEX idx_login_rate_limit_ip (ip_hash, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS cadastro_rate_limit (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ip_hash CHAR(64) NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cadastro_rate_limit_ip (ip_hash, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Código de 6 dígitos (só o hash é guardado) pra confirmar e-mail no
+-- cadastro público — prova de titularidade exigida pela LGPD antes de
+-- considerar a conta ativa (ver usuarios.email_verificado_em).
+CREATE TABLE IF NOT EXISTS verificacoes_email (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT UNSIGNED NOT NULL,
+    codigo_hash CHAR(64) NOT NULL,
+    tentativas TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expira_em DATETIME NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_verificacoes_email_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    INDEX idx_verificacoes_email_usuario (usuario_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS registros (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     veiculo_id INT UNSIGNED NOT NULL,
@@ -106,11 +143,17 @@ CREATE TABLE IF NOT EXISTS registros (
     categoria_despesa ENUM('Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro') NULL,
     valor_pago DECIMAL(10,2) NOT NULL,
     descricao VARCHAR(255) NULL,
+    -- UUID gerado no cliente pela fila offline (IndexedDB): reenviar o
+    -- mesmo registro depois de reconectar não duplica a linha (ver
+    -- inserirRegistro() em functions.php). NULL nos registros feitos
+    -- direto pelo formulário (sempre online, sem necessidade de dedupe).
+    client_uuid CHAR(36) NULL,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_registros_veiculo
         FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
+    UNIQUE KEY uq_registros_client_uuid (client_uuid),
     INDEX idx_registros_veiculo_km (veiculo_id, km_atual),
     INDEX idx_registros_tipo (tipo_registro),
     CONSTRAINT chk_litros_abastecimento
@@ -131,17 +174,76 @@ CREATE TABLE IF NOT EXISTS lembretes (
     km_alvo INT UNSIGNED NULL,
     data_alvo DATE NULL,
     concluido_em TIMESTAMP NULL,
+    -- Marca quando o push de "vencido/próximo" já foi mandado pra esse lembrete,
+    -- pra rotina de envio (cron/enviar_lembretes_push.php) não notificar de novo
+    -- a cada execução. NULL = ainda não notificado.
+    push_notificado_em TIMESTAMP NULL,
+    -- Mesma idempotência de registros.client_uuid, pra lembretes criados
+    -- offline (ver inserirLembrete() em functions.php).
+    client_uuid CHAR(36) NULL,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_lembretes_veiculo
         FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
+    UNIQUE KEY uq_lembretes_client_uuid (client_uuid),
     INDEX idx_lembretes_veiculo (veiculo_id),
     CONSTRAINT chk_lembrete_alvo
         CHECK (
             (tipo_alvo = 'KM' AND km_alvo IS NOT NULL AND data_alvo IS NULL) OR
             (tipo_alvo = 'Data' AND data_alvo IS NOT NULL AND km_alvo IS NULL)
         )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Alertas inteligentes: anomalias detectadas automaticamente a partir do
+-- histórico de registros (queda de consumo, preço acima do normal, odômetro
+-- inconsistente). Ver db/migrations/0001_alertas.sql.
+CREATE TABLE IF NOT EXISTS alertas (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT UNSIGNED NOT NULL,
+    veiculo_id INT UNSIGNED NOT NULL,
+    tipo ENUM('consumo_baixo', 'preco_alto', 'odometro_inconsistente') NOT NULL,
+    severidade ENUM('info', 'atencao', 'critico') NOT NULL,
+    titulo VARCHAR(150) NOT NULL,
+    mensagem VARCHAR(255) NOT NULL,
+    registro_id INT UNSIGNED NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lido_em TIMESTAMP NULL,
+    push_notificado_em TIMESTAMP NULL,
+    CONSTRAINT fk_alertas_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_alertas_veiculo
+        FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_alertas_registro
+        FOREIGN KEY (registro_id) REFERENCES registros(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+    INDEX idx_alertas_usuario_nao_lidos (usuario_id, lido_em),
+    INDEX idx_alertas_push_pendente (push_notificado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Inscrições de Web Push (uma por navegador/aparelho instalado) — permite
+-- notificar o usuário sobre lembretes vencendo mesmo com o app fechado.
+-- endpoint pode passar de 500 bytes com utf8mb4 (estoura o limite de índice
+-- do InnoDB), então a deduplicação é pelo hash, não pelo valor cru.
+CREATE TABLE IF NOT EXISTS push_inscricoes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT UNSIGNED NOT NULL,
+    endpoint VARCHAR(500) NOT NULL,
+    endpoint_hash CHAR(64) NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_push_inscricoes_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_push_inscricoes_endpoint_hash (endpoint_hash),
+    INDEX idx_push_inscricoes_usuario (usuario_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Catálogo de modelos pra autopreencher tanque/peso/consumo de fábrica ao

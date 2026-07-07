@@ -7,7 +7,7 @@ header('Content-Type: application/json; charset=utf-8');
 $usuario = usuarioAtual();
 if ($usuario === null) {
     http_response_code(401);
-    echo json_encode(['ok' => false, 'erro' => 'Sessão expirada. Entre novamente pra sincronizar.']);
+    echo json_encode(['ok' => false, 'erro' => 'Sessão expirada.']);
     exit;
 }
 
@@ -30,22 +30,17 @@ if (!csrfValidar($corpo['csrf_token'] ?? null)) {
     exit;
 }
 
-$clientUuid = isset($corpo['client_uuid']) ? (string) $corpo['client_uuid'] : null;
-if ($clientUuid !== null && !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $clientUuid)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'erro' => 'client_uuid inválido.']);
-    exit;
-}
-
-$resultado = validarRegistro($pdo, $usuario['id'], $corpo);
-if (!$resultado['ok']) {
+$id = filter_var($corpo['id'] ?? '', FILTER_VALIDATE_INT);
+if (!$id) {
     http_response_code(422);
-    echo json_encode(['ok' => false, 'erros' => $resultado['erros']]);
+    echo json_encode(['ok' => false, 'erro' => 'ID inválido.']);
     exit;
 }
 
-$inserido = inserirRegistro($pdo, $resultado['valores'], $clientUuid);
-if ($inserido['novo']) {
-    detectarAnomaliasRegistro($pdo, $usuario['id'], $resultado['valores'], $inserido['id']);
-}
-echo json_encode(['ok' => true, 'id' => $inserido['id']]);
+// Restrito ao próprio usuário — alertas guardam usuario_id diretamente.
+$stmt = $pdo->prepare(
+    'UPDATE alertas SET lido_em = NOW() WHERE id = :id AND usuario_id = :usuario_id AND lido_em IS NULL'
+);
+$stmt->execute([':id' => $id, ':usuario_id' => $usuario['id']]);
+
+echo json_encode(['ok' => true]);

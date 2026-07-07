@@ -13,6 +13,7 @@ if (usuarioAtual() !== null) {
 $erros = [];
 $nome = '';
 $email = '';
+$cadastroConcluido = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrfVerificarOuFalhar();
@@ -58,11 +59,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>';
                 enviarEmail($email, 'Seu código de confirmação — PitStop BR', $corpoHtml);
 
+                // Sem redirect (Location) aqui: um 302 imediato só nesse
+                // caminho seria, sozinho, um jeito ainda mais óbvio que
+                // timing de distinguir "e-mail novo" de "e-mail já existe"
+                // (o outro ramo, abaixo, não redireciona). Os dois ramos
+                // respondem 200 com a mesma tela; quem se cadastrou de
+                // verdade segue pro código pelo link "Confirmar e-mail".
                 $_SESSION['verificacao_pendente_id'] = $resultado['id'];
-                header('Location: verificar_email.php');
-                exit;
+                $cadastroConcluido = true;
+            } elseif ($resultado['erro'] === 'email_existente') {
+                // Não revela que a conta já existe: sem código, sem login
+                // automático — só avisa o dono de verdade daquele e-mail, e
+                // mostra pro requisitante a MESMA tela de sucesso de um
+                // cadastro novo (ver $cadastroConcluido abaixo).
+                $corpoHtml = '
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif; color:#13151a; max-width:480px; margin:0 auto; line-height:1.6; font-size:15px;">
+  <div style="background:linear-gradient(180deg,#23272f,#13151a); padding:24px 28px; border-radius:12px 12px 0 0;">
+    <p style="margin:0; color:#ffffff; font-size:22px; font-weight:700;">Pit<span style="color:#ff6b35;">Stop</span> BR</p>
+  </div>
+  <div style="background:#ffffff; padding:28px; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px;">
+    <p>Olá!</p>
+    <p>Alguém tentou criar uma conta no PitStop BR usando este e-mail, que já está cadastrado.</p>
+    <p>Se foi você e esqueceu sua senha, use a opção <strong>"Esqueci minha senha"</strong> na tela de login pra recuperar o acesso. Se não foi você, pode ignorar este e-mail — nada mudou na sua conta.</p>
+  </div>
+</div>';
+                enviarEmail($email, 'Tentativa de cadastro — PitStop BR', $corpoHtml);
+                $cadastroConcluido = true;
+            } else {
+                $erros[] = $resultado['erro'];
             }
-            $erros[] = $resultado['erro'];
         }
     }
 }
@@ -80,6 +105,16 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($cadastroConcluido): ?>
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4 text-center">
+        <i class="bi bi-envelope-check text-success" style="font-size:2.5rem;"></i>
+        <p class="mt-3 mb-3">Quase lá! Mandamos as instruções de confirmação pro e-mail informado. Confira sua caixa de entrada (e o spam).</p>
+        <a href="verificar_email.php" class="btn btn-primary mb-2 w-100">Confirmar e-mail</a>
+        <a href="login.php" class="btn btn-outline-secondary w-100">Voltar pro login</a>
+    </div>
+</div>
+<?php else: ?>
 <form method="post" action="cadastro.php" class="card shadow-sm border-0" novalidate>
     <div class="card-body p-4">
         <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
@@ -135,6 +170,7 @@ require __DIR__ . '/includes/header.php';
         </p>
     </div>
 </form>
+<?php endif; ?>
 
 <script src="assets/js/auth.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

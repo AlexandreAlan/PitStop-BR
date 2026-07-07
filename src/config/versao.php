@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.14.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.14.0',
+        'resumo'  => 'Alertas inteligentes no painel principal: o app agora avisa sozinho quando um abastecimento foge do padrão do seu veículo — consumo bem abaixo da média (pode ser hora de revisar), preço por litro bem acima do que você costuma pagar, ou km rodado que não bate com o último registrado. Cada alerta pode ser dispensado com um toque e também chega por notificação push (se ativada). Essa versão também traz melhorias de segurança nos bastidores, sem mudança visível pro uso do dia a dia.',
+    ],
     [
         'versao'  => '1.11.0',
         'resumo'  => 'Novo card "Autonomia estimada" no painel principal: combinando a capacidade do tanque do veículo com sua última média de consumo, o app estima quantos km ainda dá pra rodar com o tanque cheio. Aparece automaticamente quando você cadastra a capacidade do tanque em Veículos.',

@@ -67,7 +67,17 @@ function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, 
     $existe = $pdo->prepare('SELECT 1 FROM usuarios WHERE email = :email');
     $existe->execute([':email' => $email]);
     if ($existe->fetchColumn()) {
-        return ['ok' => false, 'erro' => 'Já existe uma conta com esse e-mail.'];
+        // Faz o mesmo bcrypt "inútil" que o caminho de sucesso faria — sem
+        // isso, esse retorno adiantado é uns bons milissegundos mais rápido
+        // que o caminho que hasheia e insere de verdade, e esse tempo de
+        // resposta sozinho já revelaria quais e-mails têm conta (a mesma
+        // classe de vazamento já corrigida em esqueci_senha.php).
+        password_hash($senha, PASSWORD_DEFAULT);
+        // Não revela pro requisitante que o e-mail já tem conta (evita
+        // enumeração de contas): 'email_existente' é só um sinal interno pra
+        // cadastro.php decidir o que fazer (avisar o dono da conta por
+        // e-mail), nunca é texto mostrado na tela.
+        return ['ok' => false, 'erro' => 'email_existente'];
     }
 
     $hash = password_hash($senha, PASSWORD_DEFAULT);

@@ -16,6 +16,26 @@ function clienteIp(): string
     return (string) ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
 }
 
+/**
+ * URL base do site pra montar links absolutos em e-mails (convite, reset de
+ * senha). Prioriza a env APP_URL (fixa, definida no deploy) — nunca confia
+ * em Host/X-Forwarded-Proto da requisição pra isso, senão um Host forjado
+ * poderia colocar um domínio malicioso no link mandado pro usuário (host
+ * header poisoning). Sem APP_URL configurada, cai pro Host da requisição
+ * só como fallback de desenvolvimento local.
+ */
+function baseUrl(): string
+{
+    $appUrl = getenv('APP_URL');
+    if ($appUrl !== false && $appUrl !== '') {
+        return rtrim($appUrl, '/');
+    }
+
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    return ($isHttps ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+
 function flashSet(string $tipo, string $mensagem): void
 {
     $_SESSION['flash'] = ['tipo' => $tipo, 'mensagem' => $mensagem];
@@ -373,15 +393,18 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
  * Insere um registro já validado (ver validarRegistro). $clientUuid, quando
  * informado, torna a inserção idempotente — reenvios da fila offline com o
  * mesmo uuid não duplicam a linha (ver UNIQUE KEY uq_registros_client_uuid).
+ * Retorna ['id' => int, 'novo' => bool] — 'novo' distingue uma inserção real
+ * de um replay idempotente, pra quem chama (ex.: detectarAnomaliasRegistro)
+ * não reprocessar o mesmo registro a cada reenvio da fila offline.
  */
-function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): int
+function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): array
 {
     if ($clientUuid !== null) {
         $existente = $pdo->prepare('SELECT id FROM registros WHERE client_uuid = :uuid');
         $existente->execute([':uuid' => $clientUuid]);
         $id = $existente->fetchColumn();
         if ($id !== false) {
-            return (int) $id;
+            return ['id' => (int) $id, 'novo' => false];
         }
     }
 
@@ -402,7 +425,134 @@ function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): 
         ':client_uuid'       => $clientUuid,
     ]);
 
-    return (int) $pdo->lastInsertId();
+    return ['id' => (int) $pdo->lastInsertId(), 'novo' => true];
+}
+
+const LIMIAR_QUEDA_CONSUMO = 0.20; // 20% pior que a média histórica do veículo
+const LIMIAR_ALTA_PRECO    = 0.15; // 15% acima do preço/L médio histórico do veículo
+
+/**
+ * Insere um alerta pro usuário. Uso interno de detectarAnomaliasRegistro().
+ */
+function inserirAlerta(PDO $pdo, int $usuarioId, int $veiculoId, ?int $registroId, string $tipo, string $severidade, string $titulo, string $mensagem): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO alertas (usuario_id, veiculo_id, tipo, severidade, titulo, mensagem, registro_id)
+         VALUES (:usuario_id, :veiculo_id, :tipo, :severidade, :titulo, :mensagem, :registro_id)'
+    );
+    $stmt->execute([
+        ':usuario_id'  => $usuarioId,
+        ':veiculo_id'  => $veiculoId,
+        ':tipo'        => $tipo,
+        ':severidade'  => $severidade,
+        ':titulo'      => $titulo,
+        ':mensagem'    => $mensagem,
+        ':registro_id' => $registroId,
+    ]);
+}
+
+/**
+ * Detecta anomalias no registro recém-inserido (odômetro fora de ordem,
+ * consumo em queda, preço acima do normal) e grava um alerta pra cada uma
+ * encontrada. Chamar logo depois de inserirRegistro(). Nunca lança exceção:
+ * é uma verificação best-effort e um erro aqui não pode impedir o registro
+ * em si — só loga e segue.
+ */
+function detectarAnomaliasRegistro(PDO $pdo, int $usuarioId, array $valores, int $registroId): void
+{
+    try {
+        $veiculoId = (int) $valores['veiculo_id'];
+        $kmAtual   = (int) $valores['km_atual'];
+
+        // Odômetro fora de ordem: km menor ou igual ao maior já registrado
+        // pro veículo (em qualquer tipo de registro) — sugere erro de
+        // digitação ou lançamento fora de ordem.
+        $stmt = $pdo->prepare(
+            'SELECT MAX(km_atual) FROM registros WHERE veiculo_id = :veiculo_id AND id != :registro_id'
+        );
+        $stmt->execute([':veiculo_id' => $veiculoId, ':registro_id' => $registroId]);
+        $kmAnteriorMax = $stmt->fetchColumn();
+        if ($kmAnteriorMax !== false && $kmAnteriorMax !== null && $kmAtual <= (int) $kmAnteriorMax) {
+            inserirAlerta(
+                $pdo, $usuarioId, $veiculoId, $registroId, 'odometro_inconsistente', 'atencao',
+                'Odômetro fora de ordem',
+                "KM {$kmAtual} informado é menor ou igual ao último já registrado ({$kmAnteriorMax}). Confira o valor."
+            );
+        }
+
+        if ($valores['tipo_registro'] !== 'Abastecimento' || !$valores['litros']) {
+            return;
+        }
+
+        $litros    = (float) $valores['litros'];
+        $valorPago = (float) $valores['valor_pago'];
+
+        // Consumo em queda: compara o km/l do trecho recém-fechado (o mais
+        // recente, por km_atual) com a média dos trechos anteriores do
+        // mesmo veículo. Exige pelo menos 3 trechos no total pra ter uma
+        // linha de base minimamente confiável antes de comparar.
+        $stmt = $pdo->prepare(
+            "SELECT km_atual, litros, LAG(km_atual) OVER (ORDER BY km_atual) AS km_anterior
+             FROM registros
+             WHERE veiculo_id = :veiculo_id AND tipo_registro = 'Abastecimento' AND litros IS NOT NULL
+             ORDER BY km_atual"
+        );
+        $stmt->execute([':veiculo_id' => $veiculoId]);
+        $trechos = [];
+        foreach ($stmt->fetchAll() as $linha) {
+            if ($linha['km_anterior'] === null) {
+                continue;
+            }
+            $kmTrecho     = (int) $linha['km_atual'] - (int) $linha['km_anterior'];
+            $litrosTrecho = (float) $linha['litros'];
+            if ($kmTrecho > 0 && $litrosTrecho > 0) {
+                $trechos[] = $kmTrecho / $litrosTrecho;
+            }
+        }
+        if (count($trechos) >= 3) {
+            $trechoAtual   = array_pop($trechos);
+            $mediaAnterior = array_sum($trechos) / count($trechos);
+            if ($mediaAnterior > 0 && $trechoAtual < $mediaAnterior * (1 - LIMIAR_QUEDA_CONSUMO)) {
+                $percentual = (int) round((1 - $trechoAtual / $mediaAnterior) * 100);
+                inserirAlerta(
+                    $pdo, $usuarioId, $veiculoId, $registroId, 'consumo_baixo', 'atencao',
+                    'Consumo abaixo do normal',
+                    "Este abastecimento rendeu {$percentual}% menos que a média do veículo. Pode valer uma revisão."
+                );
+            }
+        }
+
+        // Preço acima do normal: compara o preço/L pago com a média dos
+        // outros abastecimentos do mesmo veículo. Exige pelo menos 2
+        // abastecimentos anteriores pra ter uma média minimamente estável.
+        $stmt = $pdo->prepare(
+            "SELECT valor_pago, litros FROM registros
+             WHERE veiculo_id = :veiculo_id AND tipo_registro = 'Abastecimento' AND litros IS NOT NULL
+               AND id != :registro_id"
+        );
+        $stmt->execute([':veiculo_id' => $veiculoId, ':registro_id' => $registroId]);
+        $precos = [];
+        foreach ($stmt->fetchAll() as $linha) {
+            $l = (float) $linha['litros'];
+            if ($l > 0) {
+                $precos[] = (float) $linha['valor_pago'] / $l;
+            }
+        }
+        if (count($precos) >= 2) {
+            $precoAtual = $valorPago / $litros;
+            $precoMedio = array_sum($precos) / count($precos);
+            if ($precoMedio > 0 && $precoAtual > $precoMedio * (1 + LIMIAR_ALTA_PRECO)) {
+                $percentual = (int) round(($precoAtual / $precoMedio - 1) * 100);
+                inserirAlerta(
+                    $pdo, $usuarioId, $veiculoId, $registroId, 'preco_alto', 'info',
+                    'Preço acima da média',
+                    "Preço pago {$percentual}% acima da média histórica desse veículo (" . formatarMoeda($precoAtual) . "/L)."
+                );
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('detectarAnomaliasRegistro: ' . $e->getMessage());
+    }
 }
 
 /**

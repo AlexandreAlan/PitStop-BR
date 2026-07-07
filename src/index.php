@@ -43,6 +43,18 @@ $lembretesAtencao = array_values(array_filter(
 ));
 usort($lembretesAtencao, static fn($a, $b) => $a['status'] === 'vencido' ? -1 : ($b['status'] === 'vencido' ? 1 : 0));
 
+// Alertas inteligentes não lidos (anomalias de consumo/preço/odômetro
+// detectadas ao salvar registros — ver detectarAnomaliasRegistro()).
+$alertasStmt = $pdo->prepare(
+    "SELECT id, severidade, titulo, mensagem
+     FROM alertas
+     WHERE usuario_id = :usuario_id AND lido_em IS NULL
+     ORDER BY FIELD(severidade, 'critico', 'atencao', 'info'), criado_em DESC
+     LIMIT 5"
+);
+$alertasStmt->execute([':usuario_id' => $usuario['id']]);
+$alertasNaoLidos = $alertasStmt->fetchAll();
+
 $sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao, v.nome AS veiculo_nome
                   FROM registros r
                   INNER JOIN veiculos v ON v.id = r.veiculo_id
@@ -183,6 +195,21 @@ require __DIR__ . '/includes/header.php';
         </p>
         <?php endif; ?>
     </div>
+</div>
+<?php endif; ?>
+
+<?php if ($alertasNaoLidos): ?>
+<div class="mx-1 mb-3" id="listaAlertas" data-csrf="<?= h(csrfToken()) ?>">
+    <?php foreach ($alertasNaoLidos as $a):
+        $classeAlerta = ['critico' => 'alert-danger', 'atencao' => 'alert-warning', 'info' => 'alert-info'][$a['severidade']];
+        $iconeAlerta  = ['critico' => 'bi-exclamation-octagon-fill', 'atencao' => 'bi-exclamation-triangle-fill', 'info' => 'bi-info-circle-fill'][$a['severidade']];
+    ?>
+    <div class="alert <?= $classeAlerta ?> py-2 px-3 d-flex align-items-start gap-2 mb-2 alerta-item" data-alerta-id="<?= (int) $a['id'] ?>">
+        <i class="bi <?= $iconeAlerta ?> mt-1"></i>
+        <span class="small flex-grow-1"><strong><?= h($a['titulo']) ?></strong><br><?= h($a['mensagem']) ?></span>
+        <button type="button" class="btn-close btn-close-alerta" aria-label="Dispensar alerta"></button>
+    </div>
+    <?php endforeach; ?>
 </div>
 <?php endif; ?>
 

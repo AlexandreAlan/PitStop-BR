@@ -39,10 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($usuarioEncontrado) {
                 $token = gerarTokenRedefinicaoSenha($pdo, (int) $usuarioEncontrado['id']);
 
-                $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-                $baseUrl = ($isHttps ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-                $linkRedefinicao = $baseUrl . '/redefinir_senha.php?token=' . $token;
+                $linkRedefinicao = baseUrl() . '/redefinir_senha.php?token=' . $token;
 
                 $corpoHtml = '
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif; color:#13151a; max-width:480px; margin:0 auto; line-height:1.6; font-size:15px;">

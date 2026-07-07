@@ -35,7 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $resultado = validarRegistro($pdo, $usuario['id'], $dados);
     if ($resultado['ok']) {
-        inserirRegistro($pdo, $resultado['valores']);
+        $inserido = inserirRegistro($pdo, $resultado['valores']);
+        detectarAnomaliasRegistro($pdo, $usuario['id'], $resultado['valores'], $inserido['id']);
         flashSet('sucesso', 'Registro salvo com sucesso.');
         header('Location: index.php');
         exit;

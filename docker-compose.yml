@@ -13,6 +13,7 @@ services:
       DB_NAME: ${MYSQL_DATABASE}
       DB_USER: ${MYSQL_USER}
       DB_PASS: ${MYSQL_PASSWORD}
+      APP_URL: ${APP_URL:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_SECURE: ${SMTP_SECURE:-true}
@@ -48,8 +49,9 @@ services:
           cpus: "0.50"
           memory: 256M
 
-  # Roda cron/enviar_lembretes_push.php de hora em hora: manda notificação
-  # push (Web Push) pra quem tem lembrete vencendo/vencido, mesmo com o app
+  # Roda cron/enviar_lembretes_push.php e cron/enviar_alertas_push.php de
+  # hora em hora: manda notificação push (Web Push) pra quem tem lembrete
+  # vencendo/vencido ou alerta inteligente não notificado, mesmo com o app
   # fechado. Mesma imagem do "web", sem servir HTTP nenhum (sem ports).
   cron:
     build:
@@ -58,7 +60,7 @@ services:
     restart: unless-stopped
     entrypoint: ["sh", "-c"]
     command:
-      - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; sleep 3600; done"
+      - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; php /var/www/html/cron/enviar_alertas_push.php; sleep 3600; done"
     volumes:
       - ./src:/var/www/html:ro
     environment:
