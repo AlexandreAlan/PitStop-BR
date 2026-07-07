@@ -58,6 +58,10 @@ services:
       context: ./docker/php
     container_name: pitstop_cron
     restart: unless-stopped
+    # Só conecta no MySQL e manda e-mail/push — não precisa de root (ao
+    # contrário do "web", que precisa dele pro Apache bindar a porta 80 e
+    # gerenciar os workers). www-data (33:33) já existe na mesma imagem.
+    user: "33:33"
     entrypoint: ["sh", "-c"]
     command:
       - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; php /var/www/html/cron/enviar_alertas_push.php; sleep 3600; done"
