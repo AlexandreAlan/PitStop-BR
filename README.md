@@ -8,6 +8,14 @@
 Sistema web simples, focado em mobile, para registrar abastecimentos e manutenções de veículos e
 acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.br**.
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="19%" alt="Painel principal com alertas inteligentes, meta do mês e conquistas" />
+  <img src="docs/screenshots/relatorios.png" width="19%" alt="Relatórios com gráficos de gasto, consumo e categorias" />
+  <img src="docs/screenshots/combustivel.png" width="19%" alt="Calculadora Etanol x Gasolina" />
+  <img src="docs/screenshots/lembretes.png" width="19%" alt="Lembretes de manutenção por km ou data" />
+  <img src="docs/screenshots/login.png" width="19%" alt="Tela de login" />
+</p>
+
 ## Funcionalidades
 
 - Multi-usuário: cada conta só enxerga e mexe nos próprios veículos/registros
