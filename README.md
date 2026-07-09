@@ -224,6 +224,17 @@ docker compose up -d --build
 
 App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS em produção).
 
+## Release e versionamento
+
+A versão exibida no app (rodapé, aviso de atualização) e o changelog em linguagem simples vivem em
+`src/config/versao.php` (`APP_VERSION`/`APP_CHANGELOG`). Ao dar bump nessa versão e mergear em
+`main`, o workflow `.github/workflows/release.yml` cria sozinho a tag e a Release
+correspondente no GitHub (`vX.Y.Z`), usando o próprio texto de `APP_CHANGELOG` como notas — sem
+passo manual e sem duplicar o changelog em outro lugar. Isso, por sua vez, dispara o
+`docker-publish.yml` já existente, que builda e publica a imagem no GHCR com a tag semver da
+release. Basta então atualizar a tabela abaixo (histórico técnico, mais detalhado que o do app) no
+mesmo commit.
+
 ## Histórico de Versões
 
 | Versão | Data       | Descrição                                                                 |
