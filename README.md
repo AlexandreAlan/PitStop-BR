@@ -82,12 +82,14 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 - **Notificações push:** [minishlink/web-push](https://github.com/web-push-libs/web-push-php) (única dependência via Composer do projeto — VAPID + criptografia do payload são delicados demais pra reinventar na mão) rodando num serviço `cron` dedicado
 - **App Android:** TWA (Trusted Web Activity) gerado com Bubblewrap, assinado com keystore próprio
 - **Infra:** Docker Compose (build próprio da imagem PHP+Apache hardenizada)
+- **Testes:** PHPUnit (dependência de desenvolvimento, `composer install` sem `--no-dev`) — testes unitários da lógica de negócio pura e testes de integração contra MySQL real; gate automático em CI (ver [Testes](#testes))
 
 ## Estrutura de pastas
 
 ```
 pitstop-br/
 ├── docker-compose.yml
+├── phpunit.xml              # config do PHPUnit (bootstrap, suítes Unit/Integration)
 ├── .env                    # credenciais (gitignored, gerado localmente)
 ├── db/
 │   └── init.sql            # schema + seed inicial
@@ -95,6 +97,10 @@ pitstop-br/
 │   ├── Dockerfile          # imagem PHP+Apache hardenizada
 │   ├── php.ini             # hardening PHP (expose_php off, sessão segura, sem upload...)
 │   └── security.conf       # hardening Apache (headers, sem listagem de diretório)
+├── tests/
+│   ├── bootstrap.php        # autoload + require das funções testadas
+│   ├── Unit/                # lógica de negócio pura (sem banco) + PDO SQLite em memória
+│   └── Integration/         # fluxos que exigem MySQL real (window functions, FOR UPDATE...)
 └── src/
     ├── api/
     │   ├── registro.php    # POST idempotente (client_uuid) usado pela fila offline
@@ -224,6 +230,61 @@ docker compose up -d --build
 
 App disponível em `http://127.0.0.1:8033` (atrás de proxy reverso Nginx + TLS em produção).
 
+## Testes
+
+O projeto usa [PHPUnit](https://phpunit.de/) (dependência de desenvolvimento, não vai pra produção —
+`scripts/composer-install.sh` roda `composer install --no-dev`). Duas suítes:
+
+- **Unit** (`tests/Unit/`): lógica de negócio pura de `src/includes/functions.php` e
+  `src/config/{auth,csrf}.php` (validação/whitelist de registro e lembrete, cálculo de status de
+  lembrete, escape de HTML, sanitização de célula CSV, cadastro/login/lockout). Não precisa de
+  MySQL — as poucas funções que consultam o banco usam um PDO SQLite em memória (a query em si é
+  portável entre os dois; ver `tests/Unit/Fixtures/SqliteFixture.php`).
+- **Integration** (`tests/Integration/`): fluxos que dependem de recursos exclusivos do MySQL —
+  window functions (`LAG() OVER`), `DATE_FORMAT`, `GREATEST`, `SELECT ... FOR UPDATE` — usados no
+  cálculo de km/l (`calcularUltimaMedia`), estatísticas de veículo, detecção de anomalias
+  (`detectarAnomaliasRegistro`), conquistas e nos fluxos de verificação de e-mail/redefinição de
+  senha. Precisa de um banco MySQL de teste (nunca o de produção); sem a env `DB_HOST` definida,
+  a suíte inteira é pulada (`markTestSkipped`), não falha.
+
+Rodar só os testes unitários (sem precisar de Docker/MySQL, só PHP 8.2 + Composer):
+
+```bash
+docker run --rm -v "$(pwd)/src:/app" -w /app composer:2 install   # instala com dev deps
+docker run --rm -v "$(pwd):/app" -w /app php:8.2-cli php src/vendor/bin/phpunit --testsuite Unit
+```
+
+Rodar a suíte completa (unit + integration) contra um MySQL de teste descartável:
+
+```bash
+docker network create pitstop-test-net
+docker run -d --name pitstop-test-mysql --network pitstop-test-net \
+  -e MYSQL_ROOT_PASSWORD=root_test_pw -e MYSQL_DATABASE=pitstop_test \
+  -e MYSQL_USER=pitstop_test -e MYSQL_PASSWORD=pitstop_test_pw mysql:8.0
+# aguarde o healthcheck e carregue o schema:
+docker exec -i pitstop-test-mysql mysql -uroot -proot_test_pw pitstop_test < db/init.sql
+
+docker run --rm --network pitstop-test-net -v "$(pwd):/app" -w /app \
+  -e DB_HOST=pitstop-test-mysql -e DB_NAME=pitstop_test \
+  -e DB_USER=pitstop_test -e DB_PASS=pitstop_test_pw \
+  php:8.2-cli bash -c "docker-php-ext-install -j$(nproc) pdo_mysql >/dev/null && php src/vendor/bin/phpunit"
+
+docker rm -f pitstop-test-mysql && docker network rm pitstop-test-net
+```
+
+Em CI (`.github/workflows/docker-publish.yml`), o job `test` faz exatamente isso (MySQL como
+`services:` do GitHub Actions) em todo push e pull request, como gate antes do job `build-and-push`
+— a imagem só builda/publica no GHCR se a suíte inteira passar.
+
+**Limitação conhecida**: como o roteamento é manual por arquivo (sem framework/front controller),
+as próprias páginas (`adicionar.php`, `veiculos.php`, `relatorios.php` etc.) misturam sessão,
+CSRF, PDO e HTML/redirect na mesma requisição — não são testáveis por PHPUnit sem um refactor
+grande de arquitetura (extrair a lógica de cada página pra uma função pura, como já é o caso de
+`validarRegistro`/`validarLembrete`/`calcularEstatisticasVeiculo`). Os testes desta suíte cobrem
+toda a lógica de negócio e validação que já vive em funções (`includes/functions.php`,
+`config/auth.php`, `config/csrf.php`); o comportamento HTTP das páginas em si (rotas, redirects,
+render) continua dependendo de teste manual.
+
 ## Release e versionamento
 
 A versão exibida no app (rodapé, aviso de atualização) e o changelog em linguagem simples vivem em
@@ -239,6 +300,7 @@ mesmo commit.
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
+| 1.14.1 | 2026-07-09 | **Testes automatizados** (o projeto não tinha nenhum): PHPUnit configurado via Composer (`require-dev`, fora do build de produção). Suíte **Unit** (70 testes, sem banco) cobre a lógica de negócio pura de `functions.php`/`auth.php`/`csrf.php` — validação/whitelist de registro e lembrete, cálculo de status de lembrete, escape/sanitização (CSV/Formula Injection), cadastro e login (lockout progressivo, conta bloqueada, e-mail não verificado), usando um PDO SQLite em memória pras poucas consultas cuja SQL é portável. Suíte **Integration** (28 testes) cobre, contra um MySQL real, o que depende de recursos exclusivos dele (window functions, `DATE_FORMAT`, `GREATEST`, `SELECT ... FOR UPDATE`): cálculo de km/l (`calcularUltimaMedia`) e estatísticas de veículo, as 3 detecções de `detectarAnomaliasRegistro`, idempotência de `inserirRegistro`/`inserirLembrete` via `client_uuid`, conquistas e os fluxos completos de verificação de e-mail/redefinição de senha; pulada (não falha) sem um banco de teste disponível. Novo job `test` em `docker-publish.yml` roda a suíte inteira (MySQL como serviço do GitHub Actions) em todo push/PR, como gate antes do build/push da imagem pro GHCR — build só acontece se os testes passarem. Nenhum arquivo servido em produção foi alterado (dependência de teste e `tests/` ficam fora do `--no-dev` do deploy); ver seção **Testes** para como rodar localmente e a limitação conhecida (páginas em si, sem extrair a lógica pra função, continuam fora do escopo do PHPUnit sem um refactor de arquitetura maior) |
 | 1.14.0 | 2026-07-06 | **Alertas inteligentes**: nova tabela `alertas` detecta, a partir do histórico de `registros`, três anomalias por abastecimento — consumo 20%+ pior que a média do veículo, preço/L 15%+ acima da média e odômetro menor/igual ao último já registrado (esse último vale pra qualquer tipo de registro, não só abastecimento). Detecção em `detectarAnomaliasRegistro()` (`functions.php`), chamada logo após `inserirRegistro()` em `adicionar.php` e `api/registro.php` — `inserirRegistro()` passou a retornar `['id','novo']` pra fila offline não reprocessar (e duplicar alerta) num replay idempotente do mesmo `client_uuid`. Painel principal ganha bloco de alertas não lidos (dispensável, `api/alerta_lido.php`) e novo cron `enviar_alertas_push.php` (mesmo padrão de dedupe de lembretes, via `push_notificado_em`). **Segurança**: cadastro com e-mail já existente agora responde de forma indistinguível de um cadastro novo (mesmo HTTP 200, mesma tela, mesmo `password_hash()` "inútil" pra igualar o tempo) — e-mail avisa o dono de verdade, sem código nem login automático; `APP_URL` fixa via env substitui `Host` da requisição nos links de convite/redefinição de senha (fecha host header poisoning); sessão ganha timeout de inatividade de 7 dias além do cookie de 30 (`bootstrap.php`); CSP ganha `report-uri` (endpoint novo `api/csp_report.php`, sem auth/CSRF — é o navegador quem chama) e HSTS ganha `preload`. Also reconciliado o drift entre `db/init.sql` e o schema real em produção (`usuarios.role`/`email_verificado_em`, `registros`/`lembretes.client_uuid`, tabelas `verificacoes_email`/`cadastro_rate_limit` — usadas pelo código, aplicadas em produção por fora deste arquivo, mas ausentes dele; sem isso uma instalação nova quebrava no primeiro cadastro/login). Testado ponta a ponta num stack Docker isolado (projeto/porta/volume próprios, produção nunca tocada): instalação do zero validando o `init.sql` corrigido; as 3 anomalias disparando via formulário real (consumo caindo de 30 para 15 km/l, preço 60% acima da média, odômetro voltando); bloco no painel e "marcar como lido" (incluindo CSRF ausente e alerta de outro dono); replay de 3 requisições com o mesmo `client_uuid` via `api/registro.php` confirmando 1 registro + 1 alerta só (não 3); cron rodando duas vezes seguidas confirmando dedupe do push; cadastro com e-mail novo vs. e-mail já existente comparados (mesmo HTTP 200, mesmo corpo, tempo equivalente); e descoberta + correção de um bug real nesse mesmo processo (o caminho de sucesso original fazia redirect 302 enquanto o de e-mail existente respondia 200 — diferença mais óbvia que timing, corrigida antes de fechar a versão) |
 | 1.13.0 | 2026-07-05 | Notificações push (Web Push) dos lembretes: `push_inscrever.php`/`push_desinscrever.php` guardam a inscrição do navegador (`push_inscricoes`, deduplicada por hash do endpoint); `sw.php` ganha os handlers `push`/`notificationclick`; novo serviço `cron` (mesma imagem do `web`, sem HTTP) roda `cron/enviar_lembretes_push.php` de hora em hora, manda um push por lembrete vencido/próximo (uma vez só por lembrete, via `lembretes.push_notificado_em`) e some sozinho com inscrições expiradas que o push service reportar. Primeira dependência via Composer do projeto (`minishlink/web-push`, MIT) — VAPID + criptografia do payload são coisa demais pra reinventar na mão; `src/vendor/` fica de fora do Git (`scripts/composer-install.sh` gera via Docker, sem exigir Composer no host). Toggle em Minha Conta só aparece com VAPID configurado. Testado ponta a ponta: geração de chaves VAPID na imagem da própria app, biblioteca carregando via autoload, e a função de envio/limpeza de inscrição expirada revisada linha a linha (sem servidor de push real disponível no ambiente de teste pra disparar uma notificação de verdade) |
 | 1.12.0 | 2026-07-05 | Conquistas (gamificação) no painel principal: sequência de meses seguidos com registro, e 5 selos por marco (Primeira Carga, 10 Abastecimentos, Motorista Veterano, Economia do Mês, Manutenção em Dia), com progresso pro próximo selo. Tudo calculado na hora (`calcularConquistas()` em `functions.php`) a partir de `registros`/`lembretes` que já existiam — sem tabela nova, sem estado próprio pra desatualizar. Testado com dados sintéticos num MySQL isolado e descartável (sequência normal, sequência quebrada por mês sem registro, lembrete vencido derrubando o selo "Em Dia") — nenhum dado real de usuário foi lido ou alterado |
