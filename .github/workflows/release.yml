@@ -1,0 +1,63 @@
+name: Release automática por versão
+
+# Cria a tag/Release do GitHub sozinho sempre que src/config/versao.php muda em main
+# (ou seja, sempre que a versão do app é bumped). As notas da release vêm do próprio
+# changelog embutido em APP_CHANGELOG, então não duplicamos texto em outro lugar.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/config/versao.php
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configura PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Lê versão e changelog de versao.php
+        id: versao
+        run: |
+          php -r '
+            require "src/config/versao.php";
+            $atual = null;
+            foreach (APP_CHANGELOG as $item) {
+              if ($item["versao"] === APP_VERSION) { $atual = $item; break; }
+            }
+            $notas = $atual["resumo"] ?? ("Bump de versão para " . APP_VERSION . ".");
+            file_put_contents(getenv("GITHUB_OUTPUT"), "version=" . APP_VERSION . "\n", FILE_APPEND);
+            file_put_contents(getenv("GITHUB_OUTPUT"), "notes<<EOF_NOTES\n" . $notas . "\nEOF_NOTES\n", FILE_APPEND);
+          '
+
+      - name: Verifica se a tag já existe
+        id: check
+        run: |
+          if git rev-parse "refs/tags/v${{ steps.versao.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cria a tag e a Release no GitHub
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.versao.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "PitStop BR v${{ steps.versao.outputs.version }}" \
+            --notes "${{ steps.versao.outputs.notes }}" \
+            --target "${{ github.sha }}"
