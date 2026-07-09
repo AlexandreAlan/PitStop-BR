@@ -29,3 +29,6 @@ src/downloads/*.apk
 
 # Dependências PHP (Composer) — geradas por scripts/composer-install.sh
 src/vendor/
+
+# Cache de execução do PHPUnit (ver phpunit.xml)
+.phpunit.cache/
