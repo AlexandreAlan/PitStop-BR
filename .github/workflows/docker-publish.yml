@@ -3,6 +3,7 @@ name: Build and Publish Docker Image
 on:
   push:
     branches: [main]
+  pull_request:
   release:
     types: [published]
 
@@ -11,7 +12,61 @@ permissions:
   packages: write
 
 jobs:
+  # Gate: roda a suíte de testes (PHPUnit) antes de qualquer build/push de
+  # imagem. Unit (src/includes/functions.php, src/config/{auth,csrf}.php) não
+  # precisa de banco; Integration exige MySQL (recursos exclusivos dele:
+  # window functions, DATE_FORMAT, SELECT ... FOR UPDATE — ver
+  # tests/Integration/DatabaseTestCase.php) e por isso sobe como serviço
+  # dedicado só para os testes, isolado do banco de produção.
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_test_pw
+          MYSQL_DATABASE: pitstop_test
+          MYSQL_USER: pitstop_test
+          MYSQL_PASSWORD: pitstop_test_pw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot_test_pw"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, pdo_sqlite, gmp
+          coverage: none
+
+      - name: Instalar dependências (Composer)
+        working-directory: src
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Carregar schema de teste no MySQL
+        run: mysql -h127.0.0.1 -uroot -proot_test_pw pitstop_test < db/init.sql
+
+      - name: Rodar PHPUnit
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: pitstop_test
+          DB_USER: pitstop_test
+          DB_PASS: pitstop_test_pw
+        run: src/vendor/bin/phpunit --configuration phpunit.xml
+
   build-and-push:
+    needs: test
+    # Nunca builda/publica em pull_request (imagem só vai pro GHCR a partir
+    # de push em main ou de uma release publicada) — só o job "test" acima
+    # roda em PR, como gate de revisão.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
