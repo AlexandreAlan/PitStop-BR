@@ -7,7 +7,7 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.14.1';
 
 const APP_CHANGELOG = [
     [
