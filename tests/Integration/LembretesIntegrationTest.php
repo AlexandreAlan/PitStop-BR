@@ -53,6 +53,29 @@ final class LembretesIntegrationTest extends DatabaseTestCase
         $this->assertSame(1, $total);
     }
 
+    public function testInserirLembreteComMesmoClientUuidDeOutroUsuarioNaoColide(): void
+    {
+        // Mesmo raciocínio de RegistrosIntegrationTest — auditoria de
+        // segurança 2026-07-11: idempotência escopada pelo dono do veículo,
+        // não global.
+        $usuarioA = $this->criarUsuario();
+        $veiculoDeA = $this->criarVeiculo($usuarioA);
+        $usuarioB = $this->criarUsuario();
+        $veiculoDeB = $this->criarVeiculo($usuarioB);
+
+        $uuid = '33333333-3333-3333-3333-333333333333';
+        $idDeA = inserirLembrete($this->pdo, [
+            'veiculo_id' => $veiculoDeA, 'descricao' => 'Óleo', 'tipo_alvo' => 'KM', 'km_alvo' => 15000, 'data_alvo' => null,
+        ], $uuid);
+        $idDeB = inserirLembrete($this->pdo, [
+            'veiculo_id' => $veiculoDeB, 'descricao' => 'Pneus', 'tipo_alvo' => 'KM', 'km_alvo' => 40000, 'data_alvo' => null,
+        ], $uuid);
+
+        $this->assertNotSame($idDeA, $idDeB);
+        $total = (int) $this->pdo->query('SELECT COUNT(*) FROM lembretes')->fetchColumn();
+        $this->assertSame(2, $total);
+    }
+
     public function testStatusDeLembretePorKmUsandoKmAtualRealDoVeiculo(): void
     {
         $usuarioId = $this->criarUsuario();
