@@ -190,6 +190,31 @@ final class RegistrosIntegrationTest extends DatabaseTestCase
         $this->assertSame(1, $total);
     }
 
+    public function testInserirRegistroComMesmoClientUuidDeOutroUsuarioNaoColide(): void
+    {
+        // Auditoria de segurança 2026-07-11: a checagem de idempotência era
+        // global (só por client_uuid), sem escopo por dono — usuário B
+        // reusando (ou adivinhando) o client_uuid de A "achava" o registro
+        // de A em vez de criar um novo, vazando o ID dele. Agora é escopada
+        // pelo dono do veículo, então o mesmo uuid em contas diferentes
+        // sempre insere duas linhas distintas.
+        $usuarioA = $this->criarUsuario();
+        $veiculoDeA = $this->criarVeiculo($usuarioA);
+        $usuarioB = $this->criarUsuario();
+        $veiculoDeB = $this->criarVeiculo($usuarioB);
+
+        $uuid = '22222222-2222-2222-2222-222222222222';
+        $deA = inserirRegistro($this->pdo, $this->valoresAbastecimento($veiculoDeA, 1000, 20.0, 100.0), $uuid);
+        $deB = inserirRegistro($this->pdo, $this->valoresAbastecimento($veiculoDeB, 2000, 15.0, 90.0), $uuid);
+
+        $this->assertTrue($deA['novo']);
+        $this->assertTrue($deB['novo']);
+        $this->assertNotSame($deA['id'], $deB['id']);
+
+        $total = (int) $this->pdo->query('SELECT COUNT(*) FROM registros')->fetchColumn();
+        $this->assertSame(2, $total);
+    }
+
     public function testInserirRegistroSemClientUuidSempreInsereNovaLinha(): void
     {
         $usuarioId = $this->criarUsuario();
