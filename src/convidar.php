@@ -4,6 +4,7 @@ require_once __DIR__ . '/config/bootstrap.php';
 require_once __DIR__ . '/config/mailer.php';
 
 const CONVITE_VALIDADE_DIAS = 7;
+const CONVITE_LIMITE_POR_HORA = 20;
 
 $usuario = exigirLogin();
 
@@ -13,44 +14,67 @@ $emailConvite = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrfVerificarOuFalhar();
 
-    $emailConvite = mb_strtolower(trim((string) ($_POST['email'] ?? '')));
+    $tentativasRecentes = $pdo->prepare(
+        'SELECT COUNT(*) FROM convite_rate_limit WHERE usuario_id = :usuario_id AND criado_em > (NOW() - INTERVAL 1 HOUR)'
+    );
+    $tentativasRecentes->execute([':usuario_id' => $usuario['id']]);
 
-    if (!filter_var($emailConvite, FILTER_VALIDATE_EMAIL) || mb_strlen($emailConvite) > 190) {
-        $erros[] = 'E-mail inválido.';
+    if ((int) $tentativasRecentes->fetchColumn() >= CONVITE_LIMITE_POR_HORA) {
+        $erros[] = 'Muitos convites enviados na última hora. Tente novamente daqui a pouco.';
     } else {
-        $existeUsuario = $pdo->prepare('SELECT 1 FROM usuarios WHERE email = :email');
-        $existeUsuario->execute([':email' => $emailConvite]);
-        if ($existeUsuario->fetchColumn()) {
-            $erros[] = 'Já existe uma conta com esse e-mail.';
-        }
+        $emailConvite = mb_strtolower(trim((string) ($_POST['email'] ?? '')));
 
-        $convitePendente = $pdo->prepare(
-            'SELECT 1 FROM convites WHERE email = :email AND usado_em IS NULL AND expira_em > NOW()'
-        );
-        $convitePendente->execute([':email' => $emailConvite]);
-        if (!$erros && $convitePendente->fetchColumn()) {
-            $erros[] = 'Já existe um convite pendente pra esse e-mail.';
-        }
-    }
+        if (!filter_var($emailConvite, FILTER_VALIDATE_EMAIL) || mb_strlen($emailConvite) > 190) {
+            $erros[] = 'E-mail inválido.';
+        } else {
+            $pdo->prepare('INSERT INTO convite_rate_limit (usuario_id) VALUES (:usuario_id)')
+                ->execute([':usuario_id' => $usuario['id']]);
 
-    if (!$erros) {
-        $token     = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $token);
-        $expiraEm  = (new DateTime())->modify('+' . CONVITE_VALIDADE_DIAS . ' days')->format('Y-m-d H:i:s');
+            // Não revela se o e-mail já tem conta ou já tem convite pendente
+            // (mesmo padrão anti-enumeração de cadastro.php/esqueci_senha.php)
+            // — a mesma tela de sucesso aparece nos três casos abaixo; só o
+            // conteúdo do e-mail muda de acordo com o estado real.
+            $existeUsuario = $pdo->prepare('SELECT nome FROM usuarios WHERE email = :email');
+            $existeUsuario->execute([':email' => $emailConvite]);
+            $usuarioExistente = $existeUsuario->fetch();
 
-        $stmt = $pdo->prepare(
-            'INSERT INTO convites (email, token_hash, criado_por, expira_em) VALUES (:email, :token_hash, :criado_por, :expira_em)'
-        );
-        $stmt->execute([
-            ':email'      => $emailConvite,
-            ':token_hash' => $tokenHash,
-            ':criado_por' => $usuario['id'],
-            ':expira_em'  => $expiraEm,
-        ]);
+            $convitePendente = $pdo->prepare(
+                'SELECT 1 FROM convites WHERE email = :email AND usado_em IS NULL AND expira_em > NOW()'
+            );
+            $convitePendente->execute([':email' => $emailConvite]);
+            $temConvitePendente = (bool) $convitePendente->fetchColumn();
 
-        $linkConvite = baseUrl() . '/convite.php?token=' . $token;
+            if ($usuarioExistente) {
+                $corpoHtml = '
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif; color:#13151a; max-width:480px; margin:0 auto; line-height:1.6; font-size:15px;">
+  <div style="background:linear-gradient(180deg,#23272f,#13151a); padding:24px 28px; border-radius:12px 12px 0 0;">
+    <p style="margin:0; color:#ffffff; font-size:22px; font-weight:700;">Pit<span style="color:#ff6b35;">Stop</span> BR</p>
+  </div>
+  <div style="background:#ffffff; padding:28px; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px;">
+    <p>Olá, ' . h($usuarioExistente['nome']) . '!</p>
+    <p>Alguém tentou convidar você para o PitStop BR usando este e-mail, que já tem conta por aqui.</p>
+    <p>Se foi você e só esqueceu que já tinha conta, pode entrar direto pela tela de login. Se não foi você, pode ignorar este e-mail — nada mudou na sua conta.</p>
+  </div>
+</div>';
+                enviarEmail($emailConvite, 'Convite pro PitStop BR', $corpoHtml);
+            } elseif (!$temConvitePendente) {
+                $token     = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $token);
+                $expiraEm  = (new DateTime())->modify('+' . CONVITE_VALIDADE_DIAS . ' days')->format('Y-m-d H:i:s');
 
-        $corpoHtml = '
+                $stmt = $pdo->prepare(
+                    'INSERT INTO convites (email, token_hash, criado_por, expira_em) VALUES (:email, :token_hash, :criado_por, :expira_em)'
+                );
+                $stmt->execute([
+                    ':email'      => $emailConvite,
+                    ':token_hash' => $tokenHash,
+                    ':criado_por' => $usuario['id'],
+                    ':expira_em'  => $expiraEm,
+                ]);
+
+                $linkConvite = baseUrl() . '/convite.php?token=' . $token;
+
+                $corpoHtml = '
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif; color:#13151a; max-width:480px; margin:0 auto; line-height:1.6; font-size:15px;">
   <div style="background:linear-gradient(180deg,#23272f,#13151a); padding:24px 28px; border-radius:12px 12px 0 0;">
     <p style="margin:0; color:#ffffff; font-size:22px; font-weight:700;">Pit<span style="color:#ff6b35;">Stop</span> BR</p>
@@ -64,15 +88,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <p style="color:#6b7280; font-size:13px;">Este link expira em ' . CONVITE_VALIDADE_DIAS . ' dias e só pode ser usado uma vez. Se você não esperava este convite, pode ignorar este e-mail.</p>
   </div>
 </div>';
+                enviarEmail($emailConvite, 'Você foi convidado pro PitStop BR', $corpoHtml);
+            }
+            // $temConvitePendente sem $usuarioExistente: já tem convite
+            // válido rolando pra esse e-mail — não manda de novo (evita
+            // spam), mas também não avisa isso pro requisitante.
 
-        $enviado = enviarEmail($emailConvite, 'Você foi convidado pro PitStop BR', $corpoHtml);
-        if ($enviado) {
             flashSet('sucesso', 'Convite enviado para ' . $emailConvite . '.');
-        } else {
-            flashSet('erro', 'O convite foi gerado, mas o e-mail não pôde ser enviado agora. Tente novamente em instantes.');
+            header('Location: convidar.php');
+            exit;
         }
-        header('Location: convidar.php');
-        exit;
     }
 }
 
