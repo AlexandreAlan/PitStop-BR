@@ -68,10 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($resultado['ok']) {
             unset($_SESSION['verificacao_pendente_id']);
-            session_regenerate_id(true);
-            $_SESSION['usuario_id']   = $usuario['id'];
-            $_SESSION['usuario_nome'] = $usuario['nome'];
-            $_SESSION['usuario_role'] = $usuario['role'];
+            iniciarSessaoUsuario($usuario['id'], $usuario['nome'], $usuario['role']);
 
             flashSet('sucesso', 'E-mail confirmado. Bem-vindo(a) ao PitStop BR!');
             header('Location: index.php');
