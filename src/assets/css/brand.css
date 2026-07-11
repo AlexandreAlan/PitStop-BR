@@ -175,6 +175,22 @@ body {
 .icone-chip-laranja { background: var(--ps-primary); }
 .icone-chip-teal    { background: var(--ps-teal); }
 
+/* Comparador de custo (Etanol × Gasolina) — o card do combustível mais
+   barato pra encher os litros escolhidos ganha borda + selo; o outro fica
+   neutro (sem cor "perdedora", só ausência de destaque). */
+.cartao-combustivel {
+    border: 2px solid transparent !important;
+    transition: border-color .25s var(--ps-ease);
+}
+.cartao-combustivel.cartao-combustivel-vencedor {
+    border-color: var(--ps-teal) !important;
+}
+#seloEtanol, #seloGasolina {
+    background: var(--ps-teal);
+    color: #fff;
+    font-size: .7rem;
+}
+
 .gasto-mes-linha {
     display: inline-flex;
     align-items: center;
