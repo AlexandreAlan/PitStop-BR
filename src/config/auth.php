@@ -43,6 +43,52 @@ function exigirAdmin(): array
     return $usuario;
 }
 
+/**
+ * Concede a sessão autenticada (login normal, aceite de convite ou
+ * verificação de e-mail — os 3 pontos de entrada da conta). Sempre
+ * regenera o ID de sessão (evita fixation) e grava 'sessao_emitida_em':
+ * usado por checarRevogacaoDeSessao() em bootstrap.php pra derrubar
+ * sessões antigas quando o dono troca a senha em outro aparelho (ver
+ * redefinirSenhaComToken() e usuarios.sessao_valida_apos).
+ */
+function iniciarSessaoUsuario(int $id, string $nome, string $role): void
+{
+    session_regenerate_id(true);
+    $_SESSION['usuario_id']       = $id;
+    $_SESSION['usuario_nome']     = $nome;
+    $_SESSION['usuario_role']     = $role;
+    $_SESSION['sessao_emitida_em'] = time();
+}
+
+/**
+ * Derruba a sessão atual se ela foi emitida antes da última troca de senha
+ * do usuário (usuarios.sessao_valida_apos) — fecha a janela de uma sessão
+ * sequestrada continuar válida depois do dono já ter trocado a senha em
+ * outro aparelho. Sessão sem 'sessao_emitida_em' (anterior a esse controle
+ * existir) é tratada como a mais antiga possível: cai assim que
+ * sessao_valida_apos for setado pela primeira vez, nunca depois.
+ */
+function checarRevogacaoDeSessao(PDO $pdo): void
+{
+    if (empty($_SESSION['usuario_id'])) {
+        return;
+    }
+
+    $stmt = $pdo->prepare('SELECT sessao_valida_apos FROM usuarios WHERE id = :id');
+    $stmt->execute([':id' => (int) $_SESSION['usuario_id']]);
+    $validaApos = $stmt->fetchColumn();
+
+    if ($validaApos === false || $validaApos === null) {
+        return;
+    }
+
+    $emitidaEm = (int) ($_SESSION['sessao_emitida_em'] ?? 0);
+    if ($emitidaEm < (new DateTime($validaApos))->getTimestamp()) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
+}
+
 function registrarUsuario(PDO $pdo, string $nome, string $email, string $senha, bool $aceitouPrivacidade): array
 {
     $nome  = trim($nome);
@@ -107,7 +153,7 @@ function gerarCodigoVerificacao(PDO $pdo, int $usuarioId): string
     );
     $stmt->execute([
         ':usuario_id'  => $usuarioId,
-        ':codigo_hash' => hash('sha256', $codigo),
+        ':codigo_hash' => password_hash($codigo, PASSWORD_DEFAULT),
         ':expira_em'   => $expiraEm,
     ]);
 
@@ -133,7 +179,7 @@ function verificarCodigoEmail(PDO $pdo, int $usuarioId, string $codigo): array
         return ['ok' => false, 'erro' => 'Código expirado. Peça um novo código.'];
     }
 
-    if (!hash_equals($registro['codigo_hash'], hash('sha256', $codigo))) {
+    if (!password_verify($codigo, $registro['codigo_hash'])) {
         $pdo->prepare('UPDATE verificacoes_email SET tentativas = tentativas + 1 WHERE id = :id')
             ->execute([':id' => $registro['id']]);
         return ['ok' => false, 'erro' => 'Código incorreto.'];
@@ -187,10 +233,7 @@ function loginUsuario(PDO $pdo, string $email, string $senha): array
         return ['ok' => true, 'precisaVerificar' => true];
     }
 
-    session_regenerate_id(true);
-    $_SESSION['usuario_id']   = (int) $usuario['id'];
-    $_SESSION['usuario_nome'] = $usuario['nome'];
-    $_SESSION['usuario_role'] = $usuario['role'];
+    iniciarSessaoUsuario((int) $usuario['id'], $usuario['nome'], $usuario['role']);
 
     return ['ok' => true];
 }
@@ -243,7 +286,11 @@ function redefinirSenhaComToken(PDO $pdo, string $token, string $novaSenha): arr
         }
 
         $hash = password_hash($novaSenha, PASSWORD_DEFAULT);
-        $pdo->prepare('UPDATE usuarios SET senha_hash = :hash, tentativas_falhas = 0, bloqueado_ate = NULL WHERE id = :id')
+        // sessao_valida_apos = NOW() derruba qualquer sessão sequestrada em
+        // outro aparelho (ver checarRevogacaoDeSessao em bootstrap.php) —
+        // sem isso, uma sessão roubada continuava válida até o dono já ter
+        // trocado a senha de propósito.
+        $pdo->prepare('UPDATE usuarios SET senha_hash = :hash, tentativas_falhas = 0, bloqueado_ate = NULL, sessao_valida_apos = NOW() WHERE id = :id')
             ->execute([':hash' => $hash, ':id' => $registro['usuario_id']]);
         $pdo->prepare('UPDATE redefinicoes_senha SET usado_em = NOW() WHERE id = :id')
             ->execute([':id' => $registro['id']]);
