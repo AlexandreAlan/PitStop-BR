@@ -100,15 +100,15 @@ abstract class DatabaseTestCase extends TestCase
      * Insere um registro de Abastecimento direto via SQL (sem passar por
      * validarRegistro/inserirRegistro), pra montar o histórico que os testes
      * de cálculo (km/l, estatísticas, anomalias) precisam como ponto de
-     * partida.
+     * partida. $tanqueCheio null = usa o DEFAULT da coluna (1/cheio).
      */
-    protected function criarAbastecimento(int $veiculoId, int $kmAtual, float $litros, float $valorPago, ?string $data = null): int
+    protected function criarAbastecimento(int $veiculoId, int $kmAtual, float $litros, float $valorPago, ?string $data = null, ?bool $tanqueCheio = null): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, valor_pago)
-             VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :valor_pago)'
+            'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, valor_pago' . ($tanqueCheio !== null ? ', tanque_cheio' : '') . ')
+             VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :valor_pago' . ($tanqueCheio !== null ? ', :tanque_cheio' : '') . ')'
         );
-        $stmt->execute([
+        $params = [
             ':veiculo_id'    => $veiculoId,
             ':data'          => $data ?? (new DateTime())->format('Y-m-d'),
             ':km_atual'      => $kmAtual,
@@ -116,7 +116,11 @@ abstract class DatabaseTestCase extends TestCase
             ':combustivel'   => 'Gasolina Comum',
             ':litros'        => $litros,
             ':valor_pago'    => $valorPago,
-        ]);
+        ];
+        if ($tanqueCheio !== null) {
+            $params[':tanque_cheio'] = $tanqueCheio ? 1 : 0;
+        }
+        $stmt->execute($params);
 
         return (int) $this->pdo->lastInsertId();
     }
