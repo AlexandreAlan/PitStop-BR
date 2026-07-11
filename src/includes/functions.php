@@ -178,6 +178,49 @@ function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): 
 }
 
 /**
+ * Estimativa de km/l pros dois abastecimentos mais recentes (por KM), SEM
+ * exigir tanque cheio em nenhum dos dois — é a mesma conta simples de antes
+ * da v1.15.0 (km desde o abastecimento anterior ÷ litros do atual).
+ *
+ * Só existe pra alimentar um número provisório no dashboard quando
+ * calcularUltimaMedia() ainda não tem nenhum trecho fechado (ver
+ * calcularTrechosConsumo) — SEMPRE rotulado como estimativa na tela, nunca
+ * usado nas estatísticas oficiais (calcularEstatisticasVeiculo) nem na
+ * detecção de consumo em queda (detectarAnomaliasRegistro): lá, um valor
+ * não confiável geraria alerta falso ou distorceria a comparação entre
+ * veículos. Sem garantia de precisão — se nenhum dos dois abastecimentos
+ * realmente encheu o tanque, o número pode vir bem torto (é o preço de dar
+ * uma resposta imediata em vez de esperar o próximo tanque cheio).
+ */
+function calcularUltimaMediaEstimativa(PDO $pdo, int $usuarioId, int $veiculoId): ?float
+{
+    $stmt = $pdo->prepare(
+        "SELECT r.km_atual, r.litros FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
+           AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL
+         ORDER BY r.km_atual DESC LIMIT 2"
+    );
+    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+    $stmt->execute();
+    $linhas = $stmt->fetchAll();
+
+    if (count($linhas) < 2) {
+        return null;
+    }
+
+    $kmRodado = (int) $linhas[0]['km_atual'] - (int) $linhas[1]['km_atual'];
+    $litros   = (float) $linhas[0]['litros'];
+
+    if ($kmRodado <= 0 || $litros <= 0) {
+        return null;
+    }
+
+    return round($kmRodado / $litros, 1);
+}
+
+/**
  * Estatísticas de um veículo específico (gasto, km rodado, custo por km e
  * consumo médio), respeitando um recorte opcional de período — usado na
  * comparação entre veículos em relatorios.php. Sempre restrito aos veículos
