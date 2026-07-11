@@ -28,6 +28,29 @@ $filtroVeiculoSql = ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_i
     . ($dataInicioFiltro !== null ? ' AND r.data >= :data_inicio' : '')
     . ($dataFimFiltro !== null ? ' AND r.data <= :data_fim' : '');
 
+// Agrupamento dos gráficos de Gasto/Km: dia, semana (segunda-feira como
+// início) ou mês (padrão, comportamento de antes). A chave de agrupamento é
+// sempre uma DATE de verdade (não uma string "%Y-%m"), pra ordenar certo nos
+// três casos com a mesma lógica — o rótulo bonito é formatado à parte, em PHP.
+$agrupamentosPermitidos = ['dia', 'semana', 'mes'];
+$agrupamento = in_array($_GET['agrupamento'] ?? '', $agrupamentosPermitidos, true) ? $_GET['agrupamento'] : 'mes';
+$grupoDataSql = match ($agrupamento) {
+    'dia'    => 'DATE(r.data)',
+    'semana' => 'DATE_SUB(r.data, INTERVAL WEEKDAY(r.data) DAY)',
+    default  => 'DATE_FORMAT(r.data, "%Y-%m-01")',
+};
+
+$mesesAbrev = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function formatarRotuloPeriodo(string $dataStr, string $agrupamento, array $mesesAbrev): string
+{
+    $d = new DateTime($dataStr);
+    return match ($agrupamento) {
+        'dia'    => $d->format('d/m'),
+        'semana' => $d->format('d/m') . '–' . (clone $d)->modify('+6 days')->format('d/m'),
+        default  => $mesesAbrev[(int) $d->format('n') - 1] . '/' . $d->format('y'),
+    };
+}
+
 $bind = function (PDOStatement $stmt) use ($usuario, $veiculoIdFiltro, $dataInicioFiltro, $dataFimFiltro): void {
     $stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
     if ($veiculoIdFiltro !== null) {
@@ -132,33 +155,34 @@ $bind($stmt);
 $stmt->execute();
 $gastoPorCategoria = $stmt->fetchAll();
 
-// Gasto por mês
+// Gasto por período (dia/semana/mês, ver $grupoDataSql acima)
 $stmt = $pdo->prepare(
-    'SELECT DATE_FORMAT(r.data, "%Y-%m") AS mes, SUM(r.valor_pago) AS total
+    'SELECT ' . $grupoDataSql . ' AS periodo, SUM(r.valor_pago) AS total
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
      WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
-     GROUP BY mes ORDER BY mes'
+     GROUP BY periodo ORDER BY periodo'
 );
 $bind($stmt);
 $stmt->execute();
-$gastoPorMes = $stmt->fetchAll();
+$gastoPorPeriodo = $stmt->fetchAll();
 
-// Km rodado por mês (diferença entre leituras consecutivas de odômetro, por veículo)
+// Km rodado por período (diferença entre leituras consecutivas de odômetro,
+// por veículo — atribuído ao período da leitura mais recente do par)
 $stmt = $pdo->prepare(
-    'SELECT mes, SUM(GREATEST(km_atual - km_anterior, 0)) AS km_rodado FROM (
-        SELECT DATE_FORMAT(r.data, "%Y-%m") AS mes, r.km_atual,
+    'SELECT periodo, SUM(GREATEST(km_atual - km_anterior, 0)) AS km_rodado FROM (
+        SELECT ' . $grupoDataSql . ' AS periodo, r.km_atual,
                LAG(r.km_atual) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual) AS km_anterior
         FROM registros r
         INNER JOIN veiculos v ON v.id = r.veiculo_id
         WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
      ) t
      WHERE km_anterior IS NOT NULL
-     GROUP BY mes ORDER BY mes'
+     GROUP BY periodo ORDER BY periodo'
 );
 $bind($stmt);
 $stmt->execute();
-$kmPorMes = $stmt->fetchAll();
+$kmPorPeriodo = $stmt->fetchAll();
 
 // Evolução do consumo (km/l): calcularTrechosConsumo() respeita
 // tanque_cheio (ver includes/functions.php) — um abastecimento parcial não
@@ -197,19 +221,51 @@ if ($veiculoIdFiltro !== null) {
     }
 }
 
-$labelsGastoMes = array_map(static fn($g) => $g['mes'], $gastoPorMes);
-$valoresGastoMes = array_map(static fn($g) => (float) $g['total'], $gastoPorMes);
-$labelsKmMes = array_map(static fn($k) => $k['mes'], $kmPorMes);
-$valoresKmMes = array_map(static fn($k) => (int) $k['km_rodado'], $kmPorMes);
+$labelsGastoMes = array_map(static fn($g) => formatarRotuloPeriodo($g['periodo'], $agrupamento, $mesesAbrev), $gastoPorPeriodo);
+$valoresGastoMes = array_map(static fn($g) => (float) $g['total'], $gastoPorPeriodo);
+$labelsKmMes = array_map(static fn($k) => formatarRotuloPeriodo($k['periodo'], $agrupamento, $mesesAbrev), $kmPorPeriodo);
+$valoresKmMes = array_map(static fn($k) => (int) $k['km_rodado'], $kmPorPeriodo);
 $labelsConsumo = array_map(static fn($c) => $c['data'], $consumo);
 $valoresConsumo = array_map(static fn($c) => $c['kml'], $consumo);
 $labelsCategorias = array_map(static fn($c) => $c['categoria'], $gastoPorCategoria);
 $valoresCategorias = array_map(static fn($c) => (float) $c['total'], $gastoPorCategoria);
 
 // Custo por km: total gasto (no período/filtro) dividido pelo km total rodado
-// no mesmo recorte (soma do km rodado por mês, já calculado acima).
-$totalKmRodado = array_sum($valoresKmMes);
+// no mesmo recorte (soma do km rodado por período, já calculado acima).
+$totalKmRodado = (int) array_sum($valoresKmMes);
 $custoPorKm = $totalKmRodado > 0 ? $totalGasto / $totalKmRodado : null;
+
+// Comparação com o período anterior de mesmo tamanho (ex.: filtro "este mês"
+// compara com o mês passado inteiro) — só calculável com os dois limites do
+// filtro definidos, senão não dá pra saber o tamanho do período pra replicar
+// pra trás.
+$variacaoGastoPercentual = null;
+if ($dataInicioFiltro !== null && $dataFimFiltro !== null) {
+    $inicio = new DateTime($dataInicioFiltro);
+    $fim    = new DateTime($dataFimFiltro);
+    $duracaoDias = $inicio->diff($fim)->days + 1;
+    $inicioAnterior = (clone $inicio)->modify("-{$duracaoDias} days")->format('Y-m-d');
+    $fimAnterior    = (clone $inicio)->modify('-1 day')->format('Y-m-d');
+
+    $stmtAnterior = $pdo->prepare(
+        'SELECT COALESCE(SUM(r.valor_pago), 0) FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND r.data >= :data_inicio AND r.data <= :data_fim'
+        . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
+    );
+    $stmtAnterior->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+    $stmtAnterior->bindValue(':data_inicio', $inicioAnterior);
+    $stmtAnterior->bindValue(':data_fim', $fimAnterior);
+    if ($veiculoIdFiltro !== null) {
+        $stmtAnterior->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
+    }
+    $stmtAnterior->execute();
+    $gastoAnterior = (float) $stmtAnterior->fetchColumn();
+
+    if ($gastoAnterior > 0) {
+        $variacaoGastoPercentual = (int) round((($totalGasto - $gastoAnterior) / $gastoAnterior) * 100);
+    }
+}
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
 
@@ -231,9 +287,12 @@ require __DIR__ . '/includes/header.php';
         </select>
     </div>
     <?php endif; ?>
-    <div class="d-flex gap-2 mb-2 atalhos-periodo">
+    <div class="d-flex gap-2 mb-2 atalhos-periodo flex-wrap">
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="7dias">Últimos 7 dias</button>
         <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="mes">Este mês</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="mespassado">Mês passado</button>
         <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="30dias">Últimos 30 dias</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="semanapassada">Semana passada</button>
         <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-periodo="ano">Este ano</button>
     </div>
     <div class="row gx-2">
@@ -246,7 +305,18 @@ require __DIR__ . '/includes/header.php';
             <input type="date" name="data_fim" id="campoDataFim" class="form-control" value="<?= h((string) $dataFimFiltro) ?>">
         </div>
     </div>
-    <div class="d-flex gap-2 mt-2">
+    <div class="mt-2">
+        <label class="form-label small text-muted mb-1">Agrupar gráficos por</label>
+        <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="agrupamento" id="agrupDia" value="dia" <?= $agrupamento === 'dia' ? 'checked' : '' ?> onchange="document.getElementById('formFiltroVeiculo').requestSubmit()">
+            <label class="btn btn-outline-secondary btn-sm" for="agrupDia">Dia</label>
+            <input type="radio" class="btn-check" name="agrupamento" id="agrupSemana" value="semana" <?= $agrupamento === 'semana' ? 'checked' : '' ?> onchange="document.getElementById('formFiltroVeiculo').requestSubmit()">
+            <label class="btn btn-outline-secondary btn-sm" for="agrupSemana">Semana</label>
+            <input type="radio" class="btn-check" name="agrupamento" id="agrupMes" value="mes" <?= $agrupamento === 'mes' ? 'checked' : '' ?> onchange="document.getElementById('formFiltroVeiculo').requestSubmit()">
+            <label class="btn btn-outline-secondary btn-sm" for="agrupMes">Mês</label>
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-primary flex-fill">
             <i class="bi bi-funnel me-1"></i>Filtrar
         </button>
@@ -266,6 +336,20 @@ require __DIR__ . '/includes/header.php';
                 <span class="icone-chip icone-chip-laranja mb-2" aria-hidden="true"><i class="bi bi-cash-stack"></i></span>
                 <p class="text-muted small mb-1">Total Gasto</p>
                 <p class="fw-bold mb-0 small stat-valor"><?= h(formatarMoeda($totalGasto)) ?></p>
+                <?php if ($variacaoGastoPercentual !== null): ?>
+                <p class="small mb-0 mt-1 <?= $variacaoGastoPercentual > 0 ? 'text-danger' : 'text-success' ?>">
+                    <i class="bi bi-arrow-<?= $variacaoGastoPercentual > 0 ? 'up' : 'down' ?> me-1"></i><?= abs($variacaoGastoPercentual) ?>% vs período anterior
+                </p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-speedometer2"></i></span>
+                <p class="text-muted small mb-1">Km Rodado</p>
+                <p class="fw-bold mb-0 small stat-valor"><?= $totalKmRodado > 0 ? h(number_format($totalKmRodado, 0, ',', '.')) . ' km' : '—' ?></p>
             </div>
         </div>
     </div>
@@ -298,10 +382,11 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php $rotuloAgrupamento = ['dia' => 'Dia', 'semana' => 'Semana', 'mes' => 'Mês'][$agrupamento]; ?>
 <div class="row">
     <div class="col-lg-6 px-1 mb-4">
-        <h6 class="text-muted mb-2">Gasto por Mês</h6>
-        <?php if (!$gastoPorMes): ?>
+        <h6 class="text-muted mb-2">Gasto por <?= h($rotuloAgrupamento) ?></h6>
+        <?php if (!$gastoPorPeriodo): ?>
             <div class="estado-vazio-mini"><i class="bi bi-bar-chart" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
         <?php else: ?>
             <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoGastoMes" height="180"></canvas></div></div>
@@ -309,8 +394,8 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <div class="col-lg-6 px-1 mb-4">
-        <h6 class="text-muted mb-2">Km Rodado por Mês</h6>
-        <?php if (!$kmPorMes): ?>
+        <h6 class="text-muted mb-2">Km Rodado por <?= h($rotuloAgrupamento) ?></h6>
+        <?php if (!$kmPorPeriodo): ?>
             <div class="estado-vazio-mini"><i class="bi bi-signpost-split" aria-hidden="true"></i>Sem dados suficientes ainda.</div>
         <?php else: ?>
             <div class="card shadow-sm border-0"><div class="card-body"><canvas id="graficoKmMes" height="180"></canvas></div></div>
