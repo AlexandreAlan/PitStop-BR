@@ -127,6 +127,14 @@ async function enviarParaFilaOffline(form, config) {
         payload[chave] = valor;
     });
 
+    // Checkbox desmarcado não entra no FormData — normaliza pra '0' explícito
+    // (mesma regra do POST direto em adicionar.php), senão o servidor
+    // interpreta a ausência como tanque cheio por padrão.
+    const tanqueCheio = form.querySelector('[name="tanque_cheio"]');
+    if (tanqueCheio) {
+        payload.tanque_cheio = tanqueCheio.checked ? '1' : '0';
+    }
+
     const csrfToken = dados.get('csrf_token');
     await window.PitstopOutbox.enfileirar(config.tipo, payload, csrfToken);
 
