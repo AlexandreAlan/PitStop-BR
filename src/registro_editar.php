@@ -12,7 +12,7 @@ if (!$id) {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao
+    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.tanque_cheio, r.categoria_despesa, r.valor_pago, r.descricao
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
      WHERE r.id = :id AND v.usuario_id = :usuario_id'
@@ -40,6 +40,7 @@ $dados = [
     'tipo_registro'     => $registro['tipo_registro'],
     'combustivel'       => (string) $registro['combustivel'],
     'litros'            => $registro['litros'] !== null ? (string) $registro['litros'] : '',
+    'tanque_cheio'      => (string) (int) $registro['tanque_cheio'],
     'categoria_despesa' => (string) $registro['categoria_despesa'],
     'valor_pago'        => (string) $registro['valor_pago'],
     'descricao'         => (string) $registro['descricao'],
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['tipo_registro']     = (string) ($_POST['tipo_registro'] ?? '');
     $dados['combustivel']       = (string) ($_POST['combustivel'] ?? '');
     $dados['litros']            = (string) ($_POST['litros'] ?? '');
+    $dados['tanque_cheio']      = isset($_POST['tanque_cheio']) ? '1' : '0';
     $dados['categoria_despesa'] = (string) ($_POST['categoria_despesa'] ?? '');
     $dados['valor_pago']        = (string) ($_POST['valor_pago'] ?? '');
     $dados['descricao']         = trim((string) ($_POST['descricao'] ?? ''));
@@ -102,11 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$erros) {
+        $tanqueCheio = filter_var($dados['tanque_cheio'], FILTER_VALIDATE_BOOLEAN);
+
         $upd = $pdo->prepare(
             'UPDATE registros r
              INNER JOIN veiculos v ON v.id = r.veiculo_id
              SET r.veiculo_id = :veiculo_id, r.data = :data, r.km_atual = :km_atual,
                  r.tipo_registro = :tipo_registro, r.combustivel = :combustivel, r.litros = :litros,
+                 r.tanque_cheio = :tanque_cheio,
                  r.categoria_despesa = :categoria_despesa, r.valor_pago = :valor_pago, r.descricao = :descricao
              WHERE r.id = :id AND v.usuario_id = :usuario_id'
         );
@@ -117,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':tipo_registro'     => $tipoRegistro,
             ':combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
             ':litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
+            ':tanque_cheio'      => $tipoRegistro === 'Abastecimento' ? ($tanqueCheio ? 1 : 0) : 1,
             ':categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
             ':valor_pago'        => $valorPago,
             ':descricao'         => $dados['descricao'] !== '' ? $dados['descricao'] : null,
@@ -195,6 +201,12 @@ require __DIR__ . '/includes/header.php';
     <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
         <label class="form-label">Litros Abastecidos</label>
         <input type="number" step="0.01" min="0.01" name="litros" class="form-control form-control-lg" inputmode="decimal" value="<?= h($dados['litros']) ?>">
+    </div>
+
+    <div class="mb-3 campo-abastecimento form-check form-switch <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
+        <input type="checkbox" role="switch" name="tanque_cheio" id="tanqueCheio" class="form-check-input" value="1" <?= $dados['tanque_cheio'] === '1' ? 'checked' : '' ?>>
+        <label class="form-check-label" for="tanqueCheio">Encheu o tanque</label>
+        <div class="form-text">Desmarque se foi só um complemento — sem isso o km/l fica errado.</div>
     </div>
 
     <div class="mb-3 campo-despesa <?= $dados['tipo_registro'] !== 'Despesa' ? 'd-none' : '' ?>">
