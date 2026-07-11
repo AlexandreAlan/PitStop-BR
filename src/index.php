@@ -19,12 +19,20 @@ $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?:
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 $conquistas = calcularConquistas($pdo, $usuario['id']);
 
+// Só faz sentido calcular (autonomia, estimativa) quando dá pra saber de
+// qual veículo é — um veículo específico filtrado, ou o único que o usuário
+// tem (sem essa certeza, misturar veículos diferentes não diz nada).
+$veiculoParaAutonomia = $veiculoIdFiltro ?? (count($veiculos) === 1 ? (int) $veiculos[0]['id'] : null);
+
 // "Sem dados" sozinho é ambíguo: parece bug quando na verdade só falta
 // fechar o trecho (ver calcularTrechosConsumo() — um abastecimento parcial
 // não fecha sozinho, fica acumulado até o próximo tanque cheio). Distingue
 // esse caso (2+ abastecimentos já registrados, mas nenhum trecho fechado)
-// do caso de fato "sem histórico" (0 ou 1 abastecimento).
+// do caso de fato "sem histórico" (0 ou 1 abastecimento) — e, no primeiro
+// caso, oferece uma estimativa best-effort (calcularUltimaMediaEstimativa,
+// SEM exigir tanque cheio), sempre marcada como não confirmada na tela.
 $aguardandoTanqueCheio = false;
+$mediaEstimativa = null;
 if ($ultimaMedia === null) {
     $totalAbastecimentosStmt = $pdo->prepare(
         'SELECT COUNT(*) FROM registros r
@@ -38,12 +46,12 @@ if ($ultimaMedia === null) {
     }
     $totalAbastecimentosStmt->execute();
     $aguardandoTanqueCheio = (int) $totalAbastecimentosStmt->fetchColumn() >= 2;
+
+    if ($aguardandoTanqueCheio && $veiculoParaAutonomia !== null) {
+        $mediaEstimativa = calcularUltimaMediaEstimativa($pdo, $usuario['id'], $veiculoParaAutonomia);
+    }
 }
 
-// Autonomia estimada (tanque x consumo médio): só faz sentido quando dá pra
-// saber de qual veículo é o tanque — um veículo específico filtrado, ou o
-// único que o usuário tem (sem essa certeza, misturar tanques não diz nada).
-$veiculoParaAutonomia = $veiculoIdFiltro ?? (count($veiculos) === 1 ? (int) $veiculos[0]['id'] : null);
 $autonomiaKm = null;
 if ($veiculoParaAutonomia !== null && $ultimaMedia !== null) {
     $tanqueStmt = $pdo->prepare('SELECT tanque_litros FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
@@ -142,6 +150,11 @@ require __DIR__ . '/includes/header.php';
                 <span class="medidor-valor">0,0</span><span class="medidor-unidade">km/l</span>
             </div>
         </div>
+        <?php elseif ($aguardandoTanqueCheio && $mediaEstimativa !== null): ?>
+        <h2 class="display-6 fw-bold text-warning mb-0"><i class="bi bi-question-diamond me-1"></i><?= h(number_format($mediaEstimativa, 1, ',', '.')) ?> km/l</h2>
+        <p class="text-warning small mb-0 mt-1">
+            <i class="bi bi-exclamation-triangle me-1"></i>Estimativa não confirmada — nenhum abastecimento recente encheu o tanque, então esse número pode estar bem errado. Encha o tanque no próximo abastecimento pra ter a média real.
+        </p>
         <?php elseif ($aguardandoTanqueCheio): ?>
         <h2 class="display-6 fw-bold text-warning mb-0"><i class="bi bi-fuel-pump me-1"></i>Aguardando</h2>
         <p class="text-muted small mb-0 mt-1">Falta um abastecimento com "Encheu o tanque" marcado pra fechar a conta</p>
