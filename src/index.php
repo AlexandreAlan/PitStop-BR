@@ -4,6 +4,12 @@ require_once __DIR__ . '/config/bootstrap.php';
 
 $usuario = exigirLogin();
 
+// Controla, em header.php, onde o aviso de atualização (#aviso-atualizacao)
+// pode aparecer — só o dashboard, nunca em telas internas (Adicionar,
+// Relatórios etc.). O canal de push (lembretes/alertas) é o outro lugar
+// permitido, já existe à parte e não depende dessa flag.
+$telaPrincipal = true;
+
 $veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
 $veiculosStmt->execute([':usuario_id' => $usuario['id']]);
 $veiculos = $veiculosStmt->fetchAll();
