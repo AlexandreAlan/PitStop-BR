@@ -72,38 +72,108 @@ function sanitizarCelulaCsv(string $valor): string
 }
 
 /**
- * KM/L calculado a partir dos dois últimos abastecimentos (por KM), não por data.
- * Sempre restrito aos veículos do usuário informado.
+ * Trechos de consumo (km/l) de um veículo, respeitando tanque_cheio.
+ *
+ * O km/l só é confiável entre dois pontos de TANQUE CHEIO confirmado: é o
+ * único jeito de saber quanto combustível foi realmente queimado num
+ * intervalo de km. Um abastecimento parcial (tanque_cheio = 0) não fecha
+ * trecho sozinho — seus litros ficam "acumulados" até o próximo tanque
+ * cheio, quando então o trecho inteiro (km rodado ÷ litros acumulados) é
+ * calculado de uma vez. Sem isso, um complemento pequeno logo após rodar
+ * muitos km gera um km/l absurdo (ex.: 4,49L depois de 310km → 69 km/l).
+ *
+ * Sempre restrito aos veículos do usuário informado. Retorna a lista de
+ * trechos fechados, ordenados por km_atual crescente.
+ *
+ * @return array<int, array{km_atual: int, km_trecho: int, litros: float, consumo: float}>
+ */
+function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?string $dataInicio = null, ?string $dataFim = null): array
+{
+    $filtroData = ($dataInicio !== null ? ' AND r.data >= :data_inicio' : '')
+        . ($dataFim !== null ? ' AND r.data <= :data_fim' : '');
+
+    $stmt = $pdo->prepare(
+        "SELECT r.km_atual, r.litros, r.tanque_cheio FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
+           AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL" . $filtroData . '
+         ORDER BY r.km_atual ASC'
+    );
+    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+    if ($dataInicio !== null) {
+        $stmt->bindValue(':data_inicio', $dataInicio);
+    }
+    if ($dataFim !== null) {
+        $stmt->bindValue(':data_fim', $dataFim);
+    }
+    $stmt->execute();
+
+    $trechos          = [];
+    $kmInicioTrecho    = null;
+    $litrosAcumulados = 0.0;
+
+    foreach ($stmt->fetchAll() as $linha) {
+        $kmAtual     = (int) $linha['km_atual'];
+        $litros      = (float) $linha['litros'];
+        $tanqueCheio = (bool) $linha['tanque_cheio'];
+
+        if ($kmInicioTrecho === null) {
+            // Ainda não temos um ponto de partida confiável — só um tanque
+            // cheio confirmado pode abrir o primeiro trecho.
+            if ($tanqueCheio) {
+                $kmInicioTrecho = $kmAtual;
+            }
+            continue;
+        }
+
+        $litrosAcumulados += $litros;
+
+        if ($tanqueCheio) {
+            $kmTrecho = $kmAtual - $kmInicioTrecho;
+            if ($kmTrecho > 0 && $litrosAcumulados > 0) {
+                $trechos[] = [
+                    'km_atual'  => $kmAtual,
+                    'km_trecho' => $kmTrecho,
+                    'litros'    => $litrosAcumulados,
+                    'consumo'   => $kmTrecho / $litrosAcumulados,
+                ];
+            }
+            $kmInicioTrecho   = $kmAtual;
+            $litrosAcumulados = 0.0;
+        }
+    }
+
+    return $trechos;
+}
+
+/**
+ * KM/L do trecho mais recente (por KM), respeitando tanque_cheio — ver
+ * calcularTrechosConsumo(). Sempre restrito aos veículos do usuário informado.
  */
 function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): ?float
 {
-    $sql = "SELECT r.km_atual, r.litros FROM registros r
-            INNER JOIN veiculos v ON v.id = r.veiculo_id
-            WHERE v.usuario_id = :usuario_id
-              AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL"
-        . ($veiculoId !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
-        . ' ORDER BY r.km_atual DESC LIMIT 2';
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
     if ($veiculoId !== null) {
-        $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
-    }
-    $stmt->execute();
-    $linhas = $stmt->fetchAll();
-
-    if (count($linhas) < 2) {
-        return null;
+        $trechos = calcularTrechosConsumo($pdo, $usuarioId, $veiculoId);
+        $ultimo  = end($trechos);
+        return $ultimo !== false ? round($ultimo['consumo'], 1) : null;
     }
 
-    $kmRodado = (int) $linhas[0]['km_atual'] - (int) $linhas[1]['km_atual'];
-    $litros   = (float) $linhas[0]['litros'];
+    // Sem veiculo_id: pega o trecho mais recente entre TODOS os veículos do
+    // usuário (cada um calculado com seu próprio corte tanque-cheio).
+    $veiculosStmt = $pdo->prepare('SELECT id FROM veiculos WHERE usuario_id = :usuario_id');
+    $veiculosStmt->execute([':usuario_id' => $usuarioId]);
 
-    if ($kmRodado <= 0 || $litros <= 0) {
-        return null;
+    $melhorTrecho = null;
+    foreach ($veiculosStmt->fetchAll(PDO::FETCH_COLUMN) as $vid) {
+        $trechos = calcularTrechosConsumo($pdo, $usuarioId, (int) $vid);
+        $ultimo  = end($trechos);
+        if ($ultimo !== false && ($melhorTrecho === null || $ultimo['km_atual'] > $melhorTrecho['km_atual'])) {
+            $melhorTrecho = $ultimo;
+        }
     }
 
-    return round($kmRodado / $litros, 1);
+    return $melhorTrecho !== null ? round($melhorTrecho['consumo'], 1) : null;
 }
 
 /**
@@ -149,25 +219,8 @@ function calcularEstatisticasVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, ?
     $stmt->execute();
     $kmRodado = (int) $stmt->fetchColumn();
 
-    $stmt = $pdo->prepare(
-        'SELECT km_atual, litros, km_anterior FROM (
-            SELECT r.km_atual, r.litros, LAG(r.km_atual) OVER (ORDER BY r.km_atual) AS km_anterior
-            FROM registros r
-            INNER JOIN veiculos v ON v.id = r.veiculo_id
-            WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
-              AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL' . $filtroData . '
-         ) t WHERE km_anterior IS NOT NULL'
-    );
-    $bind($stmt);
-    $stmt->execute();
-    $consumos = [];
-    foreach ($stmt->fetchAll() as $linha) {
-        $kmTrecho = (int) $linha['km_atual'] - (int) $linha['km_anterior'];
-        $litros   = (float) $linha['litros'];
-        if ($kmTrecho > 0 && $litros > 0) {
-            $consumos[] = $kmTrecho / $litros;
-        }
-    }
+    $trechos  = calcularTrechosConsumo($pdo, $usuarioId, $veiculoId, $dataInicio, $dataFim);
+    $consumos = array_column($trechos, 'consumo');
 
     return [
         'gasto'         => $gasto,
@@ -331,6 +384,10 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
     $litros           = $litrosStr === '' ? null : filter_var($litrosStr, FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
     $combustivel      = in_array($dados['combustivel'] ?? '', COMBUSTIVEIS_PERMITIDOS, true) ? $dados['combustivel'] : null;
     $categoriaDespesa = in_array($dados['categoria_despesa'] ?? '', CATEGORIAS_DESPESA_PERMITIDAS, true) ? $dados['categoria_despesa'] : null;
+    // Ausente = assume tanque cheio (clientes antigos, ainda sem o campo,
+    // mantêm o comportamento anterior à migração 0002). Formulários HTML
+    // sempre mandam '1' ou '0' explicitamente (ver adicionar.php).
+    $tanqueCheio      = filter_var($dados['tanque_cheio'] ?? '1', FILTER_VALIDATE_BOOLEAN);
     $descricao        = trim((string) ($dados['descricao'] ?? ''));
     $dataRegistro     = DateTime::createFromFormat('Y-m-d', $dataStr);
 
@@ -382,6 +439,7 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
             'tipo_registro'     => $tipoRegistro,
             'combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
             'litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
+            'tanque_cheio'      => $tipoRegistro === 'Abastecimento' ? $tanqueCheio : true,
             'categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
             'valor_pago'        => $valorPago,
             'descricao'         => $descricao !== '' ? $descricao : null,
@@ -409,8 +467,8 @@ function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): 
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, categoria_despesa, valor_pago, descricao, client_uuid)
-         VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :categoria_despesa, :valor_pago, :descricao, :client_uuid)'
+        'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, tanque_cheio, categoria_despesa, valor_pago, descricao, client_uuid)
+         VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :tanque_cheio, :categoria_despesa, :valor_pago, :descricao, :client_uuid)'
     );
     $stmt->execute([
         ':veiculo_id'        => $valores['veiculo_id'],
@@ -419,6 +477,9 @@ function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): 
         ':tipo_registro'     => $valores['tipo_registro'],
         ':combustivel'       => $valores['combustivel'],
         ':litros'            => $valores['litros'],
+        // Ausente (chamadores antigos/testes que montam o array na mão) =
+        // assume cheio, preservando o comportamento anterior à migração 0002.
+        ':tanque_cheio'      => ($valores['tanque_cheio'] ?? true) ? 1 : 0,
         ':categoria_despesa' => $valores['categoria_despesa'],
         ':valor_pago'        => $valores['valor_pago'],
         ':descricao'         => $valores['descricao'],
@@ -491,24 +552,7 @@ function detectarAnomaliasRegistro(PDO $pdo, int $usuarioId, array $valores, int
         // recente, por km_atual) com a média dos trechos anteriores do
         // mesmo veículo. Exige pelo menos 3 trechos no total pra ter uma
         // linha de base minimamente confiável antes de comparar.
-        $stmt = $pdo->prepare(
-            "SELECT km_atual, litros, LAG(km_atual) OVER (ORDER BY km_atual) AS km_anterior
-             FROM registros
-             WHERE veiculo_id = :veiculo_id AND tipo_registro = 'Abastecimento' AND litros IS NOT NULL
-             ORDER BY km_atual"
-        );
-        $stmt->execute([':veiculo_id' => $veiculoId]);
-        $trechos = [];
-        foreach ($stmt->fetchAll() as $linha) {
-            if ($linha['km_anterior'] === null) {
-                continue;
-            }
-            $kmTrecho     = (int) $linha['km_atual'] - (int) $linha['km_anterior'];
-            $litrosTrecho = (float) $linha['litros'];
-            if ($kmTrecho > 0 && $litrosTrecho > 0) {
-                $trechos[] = $kmTrecho / $litrosTrecho;
-            }
-        }
+        $trechos = array_column(calcularTrechosConsumo($pdo, $usuarioId, $veiculoId), 'consumo');
         if (count($trechos) >= 3) {
             $trechoAtual   = array_pop($trechos);
             $mediaAnterior = array_sum($trechos) / count($trechos);
