@@ -62,7 +62,9 @@
 <div class="app-shell">
 <main class="container">
 <?php if ($usuarioLogado !== null): ?>
+<?php if (!empty($telaPrincipal)): ?>
 <div id="aviso-atualizacao" class="d-none"></div>
+<?php endif; ?>
 <div id="pendencias-offline" class="d-none"></div>
 <?php endif; ?>
 <?php endif; ?>
