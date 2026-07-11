@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.15.3';
+const APP_VERSION = '1.16.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.16.0',
+        'resumo'  => 'Relatórios renovados: os gráficos de Gasto e Km Rodado agora podem ser vistos por dia, semana ou mês (não só mês como antes); novos atalhos de período (7 dias, mês passado, semana passada); novo card de Km Rodado total; Total Gasto mostra a variação em relação ao período anterior; e os gráficos ficaram mais claros, com cores acessíveis e valores formatados nas legendas.',
+    ],
     [
         'versao'  => '1.15.3',
         'resumo'  => 'A "Última Média" agora mostra uma estimativa (bem sinalizada como não confirmada) mesmo sem nenhum tanque cheio no histórico, em vez de só "Aguardando" — pra quem prefere ter um número aproximado logo do que esperar o próximo abastecimento completo. As estatísticas oficiais e os alertas de consumo continuam usando só dado confirmado, sem chute nenhum.',
