@@ -79,10 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ->execute([':id' => $resultado['id']]);
                     $pdo->commit();
 
-                    session_regenerate_id(true);
-                    $_SESSION['usuario_id']   = $resultado['id'];
-                    $_SESSION['usuario_nome'] = $resultado['nome'];
-                    $_SESSION['usuario_role'] = 'user';
+                    iniciarSessaoUsuario($resultado['id'], $resultado['nome'], 'user');
 
                     flashSet('sucesso', 'Conta criada com sucesso. Bem-vindo(a)!');
                     header('Location: index.php');
