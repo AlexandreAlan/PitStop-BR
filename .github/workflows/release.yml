@@ -55,9 +55,16 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          # ${{ }} interpola ANTES do bash rodar o script — texto livre do
+          # changelog (aspas, crase, $(), etc.) direto ali quebra o comando
+          # ou pior. Via env + "$VAR" o valor passa intacto, sem reinterpretação
+          # pelo shell (foi assim que a v1.15.0 falhou: aspas em "Encheu o
+          # tanque" fechavam a citação mais cedo e o resto virava glob).
+          RELEASE_VERSION: ${{ steps.versao.outputs.version }}
+          RELEASE_NOTES: ${{ steps.versao.outputs.notes }}
         run: |
-          gh release create "v${{ steps.versao.outputs.version }}" \
+          gh release create "v${RELEASE_VERSION}" \
             --repo "${{ github.repository }}" \
-            --title "PitStop BR v${{ steps.versao.outputs.version }}" \
-            --notes "${{ steps.versao.outputs.notes }}" \
+            --title "PitStop BR v${RELEASE_VERSION}" \
+            --notes "${RELEASE_NOTES}" \
             --target "${{ github.sha }}"
