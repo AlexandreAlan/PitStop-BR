@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.16.1';
+const APP_VERSION = '1.16.2';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.16.2',
+        'resumo'  => 'Melhorias de segurança nos bastidores: sessões antigas agora são encerradas quando você troca a senha, o código de verificação de e-mail ficou mais robusto, e o convite de novos usuários ganhou limite de envio. Sem mudança visível no uso do dia a dia.',
+    ],
     [
         'versao'  => '1.16.1',
         'resumo'  => 'Etanol × Gasolina ganhou um comparador de custo: além de dizer se compensa trocar, agora mostra de cara quanto custa encher a quantidade de litros que você escolher em cada combustível, lado a lado, com o mais barato destacado.',
