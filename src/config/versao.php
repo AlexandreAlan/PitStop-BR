@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.15.1';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.15.1',
+        'resumo'  => 'Corrigido: o gráfico de Evolução do Consumo em Relatórios ainda podia mostrar um km/l impossível — ele tinha sua própria conta separada, que não tinha sido atualizada junto com a correção da v1.15.0. Agora usa a mesma lógica correta (respeita o tanque cheio marcado no abastecimento) em todo o app.',
+    ],
     [
         'versao'  => '1.15.0',
         'resumo'  => 'Corrigido: o cálculo de km/l podia dar um número impossível (ex.: 69 km/l numa moto) quando você colocava só um complemento de combustível em vez de encher o tanque. Agora tem um checkbox "Encheu o tanque" ao registrar um abastecimento — desmarque quando for só um complemento, e o app vai somar certinho até o próximo tanque cheio pra calcular a média.',
