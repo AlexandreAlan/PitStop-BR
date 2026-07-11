@@ -15,6 +15,7 @@ $dados = [
     'tipo_registro'     => 'Abastecimento',
     'combustivel'       => '',
     'litros'            => '',
+    'tanque_cheio'      => '1',
     'categoria_despesa' => '',
     'valor_pago'        => '',
     'descricao'         => '',
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['tipo_registro']     = (string) ($_POST['tipo_registro'] ?? '');
     $dados['combustivel']       = (string) ($_POST['combustivel'] ?? '');
     $dados['litros']            = (string) ($_POST['litros'] ?? '');
+    $dados['tanque_cheio']      = isset($_POST['tanque_cheio']) ? '1' : '0';
     $dados['categoria_despesa'] = (string) ($_POST['categoria_despesa'] ?? '');
     $dados['valor_pago']        = (string) ($_POST['valor_pago'] ?? '');
     $dados['descricao']         = trim((string) ($_POST['descricao'] ?? ''));
@@ -117,6 +119,12 @@ require __DIR__ . '/includes/header.php';
     <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
         <label class="form-label">Litros Abastecidos</label>
         <input type="number" step="0.01" min="0.01" name="litros" class="form-control form-control-lg" inputmode="decimal" value="<?= h($dados['litros']) ?>">
+    </div>
+
+    <div class="mb-3 campo-abastecimento form-check form-switch <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
+        <input type="checkbox" role="switch" name="tanque_cheio" id="tanqueCheio" class="form-check-input" value="1" <?= $dados['tanque_cheio'] === '1' ? 'checked' : '' ?>>
+        <label class="form-check-label" for="tanqueCheio">Encheu o tanque</label>
+        <div class="form-text">Desmarque se foi só um complemento — sem isso o km/l fica errado.</div>
     </div>
 
     <div class="mb-3 campo-despesa <?= $dados['tipo_registro'] !== 'Despesa' ? 'd-none' : '' ?>">
