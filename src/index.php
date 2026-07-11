@@ -19,6 +19,27 @@ $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?:
 $ultimaMedia = calcularUltimaMedia($pdo, $usuario['id'], $veiculoIdFiltro);
 $conquistas = calcularConquistas($pdo, $usuario['id']);
 
+// "Sem dados" sozinho é ambíguo: parece bug quando na verdade só falta
+// fechar o trecho (ver calcularTrechosConsumo() — um abastecimento parcial
+// não fecha sozinho, fica acumulado até o próximo tanque cheio). Distingue
+// esse caso (2+ abastecimentos já registrados, mas nenhum trecho fechado)
+// do caso de fato "sem histórico" (0 ou 1 abastecimento).
+$aguardandoTanqueCheio = false;
+if ($ultimaMedia === null) {
+    $totalAbastecimentosStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE v.usuario_id = :usuario_id AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL'
+        . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
+    );
+    $totalAbastecimentosStmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+    if ($veiculoIdFiltro !== null) {
+        $totalAbastecimentosStmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
+    }
+    $totalAbastecimentosStmt->execute();
+    $aguardandoTanqueCheio = (int) $totalAbastecimentosStmt->fetchColumn() >= 2;
+}
+
 // Autonomia estimada (tanque x consumo médio): só faz sentido quando dá pra
 // saber de qual veículo é o tanque — um veículo específico filtrado, ou o
 // único que o usuário tem (sem essa certeza, misturar tanques não diz nada).
@@ -121,6 +142,9 @@ require __DIR__ . '/includes/header.php';
                 <span class="medidor-valor">0,0</span><span class="medidor-unidade">km/l</span>
             </div>
         </div>
+        <?php elseif ($aguardandoTanqueCheio): ?>
+        <h2 class="display-6 fw-bold text-warning mb-0"><i class="bi bi-fuel-pump me-1"></i>Aguardando</h2>
+        <p class="text-muted small mb-0 mt-1">Falta um abastecimento com "Encheu o tanque" marcado pra fechar a conta</p>
         <?php else: ?>
         <h2 class="display-6 fw-bold text-success mb-0"><i class="bi bi-speedometer2 me-1"></i>Sem dados</h2>
         <?php endif; ?>
