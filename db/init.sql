@@ -121,11 +121,9 @@ CREATE TABLE IF NOT EXISTS cadastro_rate_limit (
     INDEX idx_cadastro_rate_limit_ip (ip_hash, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Sem isso, uma conta autenticada usava convidar.php como oráculo de
--- enumeração de e-mails cadastrados (resposta explícita "já existe conta")
--- e podia mandar e-mails de "convite" em lote pra endereços arbitrários,
--- abusando do SMTP de produção pra spam — auditoria de segurança 2026-07-11.
--- Por usuario_id (quem convida), não por IP: o endpoint já exige login.
+-- Limita quantos convites uma conta pode enviar por hora — mesmo objetivo
+-- de login_rate_limit/cadastro_rate_limit (evitar abuso em volume), mas
+-- por usuario_id em vez de IP, já que o endpoint exige login.
 CREATE TABLE IF NOT EXISTS convite_rate_limit (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT UNSIGNED NOT NULL,
@@ -139,10 +137,8 @@ CREATE TABLE IF NOT EXISTS convite_rate_limit (
 CREATE TABLE IF NOT EXISTS verificacoes_email (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT UNSIGNED NOT NULL,
-    -- password_hash() (bcrypt), não sha256 puro — o código é só 6 dígitos
-    -- (espaço de 10^6), sha256 sem salt quebra por força bruta total em
-    -- menos de 1s com acesso de leitura ao banco (auditoria 2026-07-11).
-    -- VARCHAR(255) pelo mesmo motivo de usuarios.senha_hash.
+    -- password_hash() (bcrypt), mesmo padrão de usuarios.senha_hash — daí
+    -- o VARCHAR(255) em vez de um hash de tamanho fixo.
     codigo_hash VARCHAR(255) NOT NULL,
     tentativas TINYINT UNSIGNED NOT NULL DEFAULT 0,
     expira_em DATETIME NOT NULL,
@@ -179,11 +175,9 @@ CREATE TABLE IF NOT EXISTS registros (
         ON DELETE CASCADE
         ON UPDATE CASCADE,
     -- Composta com veiculo_id (não só client_uuid sozinho): um client_uuid
-    -- só precisa ser único DENTRO do mesmo veículo (é o que garante que um
-    -- reenvio da fila offline não duplica a linha) — não precisa ser único
-    -- entre usuários diferentes, e antes impedia (erro de integridade) o
-    -- fix de segurança que escopou a checagem de idempotência por dono
-    -- (auditoria 2026-07-11, ver inserirRegistro() em functions.php).
+    -- só precisa ser único DENTRO do mesmo veículo — é o que garante que um
+    -- reenvio da fila offline não duplica a linha (ver inserirRegistro()
+    -- em functions.php). Não precisa ser único entre veículos diferentes.
     UNIQUE KEY uq_registros_client_uuid (veiculo_id, client_uuid),
     INDEX idx_registros_veiculo_km (veiculo_id, km_atual),
     INDEX idx_registros_tipo (tipo_registro),

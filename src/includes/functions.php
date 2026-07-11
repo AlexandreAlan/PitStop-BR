@@ -502,8 +502,10 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
 function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): array
 {
     if ($clientUuid !== null) {
-        $existente = $pdo->prepare('SELECT id FROM registros WHERE client_uuid = :uuid');
-        $existente->execute([':uuid' => $clientUuid]);
+        // Escopado por veiculo_id — bate com a UNIQUE KEY composta
+        // (veiculo_id, client_uuid), ver migração 0006.
+        $existente = $pdo->prepare('SELECT id FROM registros WHERE client_uuid = :uuid AND veiculo_id = :veiculo_id');
+        $existente->execute([':uuid' => $clientUuid, ':veiculo_id' => $valores['veiculo_id']]);
         $id = $existente->fetchColumn();
         if ($id !== false) {
             return ['id' => (int) $id, 'novo' => false];
@@ -701,8 +703,10 @@ function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
 function inserirLembrete(PDO $pdo, array $valores, ?string $clientUuid = null): int
 {
     if ($clientUuid !== null) {
-        $existente = $pdo->prepare('SELECT id FROM lembretes WHERE client_uuid = :uuid');
-        $existente->execute([':uuid' => $clientUuid]);
+        // Mesmo raciocínio de inserirRegistro(): escopado por veiculo_id,
+        // não global — bate com a UNIQUE KEY composta (migração 0006).
+        $existente = $pdo->prepare('SELECT id FROM lembretes WHERE client_uuid = :uuid AND veiculo_id = :veiculo_id');
+        $existente->execute([':uuid' => $clientUuid, ':veiculo_id' => $valores['veiculo_id']]);
         $id = $existente->fetchColumn();
         if ($id !== false) {
             return (int) $id;

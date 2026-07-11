@@ -1,13 +1,8 @@
 -- Migração 0003: tabela convite_rate_limit.
 --
--- Auditoria de segurança 2026-07-11: convidar.php não tinha rate limit —
--- uma conta autenticada conseguia usá-lo como oráculo de enumeração de
--- e-mails cadastrados (resposta explícita revelava "já existe conta com
--- esse e-mail") e mandar volume ilimitado de e-mails de "convite" pra
--- endereços arbitrários, abusando do SMTP de produção pra spam.
---
--- Por usuario_id (quem está convidando), não por IP: o endpoint já exige
--- login, então o identificador mais direto é a própria conta.
+-- Limita quantos convites uma conta pode enviar por hora — mesmo objetivo
+-- de login_rate_limit/cadastro_rate_limit (evitar abuso em volume), mas
+-- por usuario_id em vez de IP, já que o endpoint exige login.
 --
 -- Este projeto ainda não tem um runner de migrações — aplique manualmente:
 --   docker compose exec -T db mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < db/migrations/0003_convite_rate_limit.sql
