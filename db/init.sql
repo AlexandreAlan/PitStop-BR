@@ -140,6 +140,9 @@ CREATE TABLE IF NOT EXISTS registros (
     tipo_registro ENUM('Abastecimento', 'Manutencao', 'Despesa') NOT NULL,
     combustivel ENUM('Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro') NULL,
     litros DECIMAL(6,2) NULL,
+    -- Só relevante p/ Abastecimento: encheu o tanque (1) ou foi complemento
+    -- parcial (0). Ver db/migrations/0002_tanque_cheio.sql.
+    tanque_cheio TINYINT(1) NOT NULL DEFAULT 1,
     categoria_despesa ENUM('Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro') NULL,
     valor_pago DECIMAL(10,2) NOT NULL,
     descricao VARCHAR(255) NULL,
