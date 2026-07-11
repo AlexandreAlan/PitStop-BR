@@ -32,3 +32,8 @@ src/vendor/
 
 # Cache de execução do PHPUnit (ver phpunit.xml)
 .phpunit.cache/
+
+# Relatórios de auditoria de segurança: ficam só no servidor — o repo é
+# público, e listar vulnerabilidades específicas (mesmo já corrigidas) nele
+# seria dar um roteiro de ataque de graça.
+docs/auditoria-*.md
