@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.15.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.15.0',
+        'resumo'  => 'Corrigido: o cálculo de km/l podia dar um número impossível (ex.: 69 km/l numa moto) quando você colocava só um complemento de combustível em vez de encher o tanque. Agora tem um checkbox "Encheu o tanque" ao registrar um abastecimento — desmarque quando for só um complemento, e o app vai somar certinho até o próximo tanque cheio pra calcular a média.',
+    ],
     [
         'versao'  => '1.14.0',
         'resumo'  => 'Alertas inteligentes no painel principal: o app agora avisa sozinho quando um abastecimento foge do padrão do seu veículo — consumo bem abaixo da média (pode ser hora de revisar), preço por litro bem acima do que você costuma pagar, ou km rodado que não bate com o último registrado. Cada alerta pode ser dispensado com um toque e também chega por notificação push (se ativada). Essa versão também traz melhorias de segurança nos bastidores, sem mudança visível pro uso do dia a dia.',
