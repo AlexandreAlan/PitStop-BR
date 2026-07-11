@@ -160,34 +160,24 @@ $bind($stmt);
 $stmt->execute();
 $kmPorMes = $stmt->fetchAll();
 
-// Evolução do consumo (km/l) entre abastecimentos consecutivos, por veículo
-$stmt = $pdo->prepare(
-    'SELECT data, km_atual, litros, km_anterior FROM (
-        SELECT r.data, r.km_atual, r.litros,
-               LAG(r.km_atual) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual) AS km_anterior
-        FROM registros r
-        INNER JOIN veiculos v ON v.id = r.veiculo_id
-        WHERE v.usuario_id = :usuario_id
-          AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL' . $filtroVeiculoSql . '
-     ) t
-     WHERE km_anterior IS NOT NULL
-     ORDER BY km_atual'
-);
-$bind($stmt);
-$stmt->execute();
-$consumoBruto = $stmt->fetchAll();
+// Evolução do consumo (km/l): calcularTrechosConsumo() respeita
+// tanque_cheio (ver includes/functions.php) — um abastecimento parcial não
+// fecha trecho sozinho, seus litros ficam acumulados até o próximo tanque
+// cheio. Sem filtro de veículo, junta os trechos de todos e ordena por km
+// (mistura consumos de veículos diferentes na mesma linha, igual já era).
+$veiculosParaConsumo = $veiculoIdFiltro !== null ? [$veiculoIdFiltro] : array_column($veiculos, 'id');
 
 $consumo = [];
-foreach ($consumoBruto as $c) {
-    $kmRodado = (int) $c['km_atual'] - (int) $c['km_anterior'];
-    $litros   = (float) $c['litros'];
-    if ($kmRodado > 0 && $litros > 0) {
+foreach ($veiculosParaConsumo as $vid) {
+    foreach (calcularTrechosConsumo($pdo, $usuario['id'], (int) $vid, $dataInicioFiltro, $dataFimFiltro) as $trecho) {
         $consumo[] = [
-            'data'  => (new DateTime($c['data']))->format('d/m/Y'),
-            'kml'   => round($kmRodado / $litros, 1),
+            'km_atual' => $trecho['km_atual'],
+            'data'     => (new DateTime($trecho['data']))->format('d/m/Y'),
+            'kml'      => round($trecho['consumo'], 1),
         ];
     }
 }
+usort($consumo, static fn(array $a, array $b): int => $a['km_atual'] <=> $b['km_atual']);
 
 // Comparação com o consumo de fábrica — só faz sentido com 1 veículo
 // selecionado (misturar veículos diferentes no mesmo km/l não diz nada).
