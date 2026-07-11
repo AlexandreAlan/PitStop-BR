@@ -103,6 +103,62 @@ final class AuthIntegrationTest extends DatabaseTestCase
         $this->assertNotNull($usadoEm);
     }
 
+    public function testRedefinirSenhaComTokenValidoMarcaSessaoValidaApos(): void
+    {
+        // Auditoria de segurança 2026-07-11: sem isso, uma sessão sequestrada
+        // (ex.: aparelho roubado) continuava válida mesmo depois do dono
+        // trocar a senha em outro aparelho — ver checarRevogacaoDeSessao().
+        $usuarioId = $this->criarUsuario();
+        $token = gerarTokenRedefinicaoSenha($this->pdo, $usuarioId);
+
+        $antes = $this->pdo->query("SELECT sessao_valida_apos FROM usuarios WHERE id = {$usuarioId}")->fetchColumn();
+        $this->assertNull($antes, 'nunca trocou a senha ainda — não deve ter sido setado por engano em criarUsuario()');
+
+        redefinirSenhaComToken($this->pdo, $token, 'NovaSenhaForte123');
+
+        $depois = $this->pdo->query("SELECT sessao_valida_apos FROM usuarios WHERE id = {$usuarioId}")->fetchColumn();
+        $this->assertNotNull($depois);
+    }
+
+    public function testCheckarRevogacaoDeSessaoDerrubaSessaoEmitidaAntesDaTrocaDeSenha(): void
+    {
+        $usuarioId = $this->criarUsuario();
+        iniciarSessaoUsuario($usuarioId, 'Usuária Teste', 'user');
+        $this->assertSame($usuarioId, $_SESSION['usuario_id']);
+
+        // Simula: a senha foi trocada 1 segundo DEPOIS da sessão ter sido
+        // emitida (o cenário real que o fix cobre — sessão já existia
+        // quando o dono trocou a senha em outro aparelho).
+        sleep(1);
+        $token = gerarTokenRedefinicaoSenha($this->pdo, $usuarioId);
+        redefinirSenhaComToken($this->pdo, $token, 'NovaSenhaForte123');
+
+        checarRevogacaoDeSessao($this->pdo);
+
+        $this->assertArrayNotHasKey('usuario_id', $_SESSION, 'sessão anterior à troca de senha devia ter sido derrubada');
+    }
+
+    public function testCheckarRevogacaoDeSessaoMantemSessaoEmitidaDepoisDaTrocaDeSenha(): void
+    {
+        $usuarioId = $this->criarUsuario();
+
+        $token = gerarTokenRedefinicaoSenha($this->pdo, $usuarioId);
+        redefinirSenhaComToken($this->pdo, $token, 'NovaSenhaForte123');
+
+        // Login (e a sessão que ele gera) acontece DEPOIS da troca de senha
+        // — não deve ser derrubado.
+        iniciarSessaoUsuario($usuarioId, 'Usuária Teste', 'user');
+        checarRevogacaoDeSessao($this->pdo);
+
+        $this->assertSame($usuarioId, $_SESSION['usuario_id'] ?? null);
+    }
+
+    public function testCheckarRevogacaoDeSessaoNaoMexeSemUsuarioLogado(): void
+    {
+        checarRevogacaoDeSessao($this->pdo); // não deve lançar nem exigir usuario_id na sessão
+        $this->assertArrayNotHasKey('usuario_id', $_SESSION);
+    }
+
     public function testRedefinirSenhaComTokenJaUsadoFalha(): void
     {
         $usuarioId = $this->criarUsuario();
