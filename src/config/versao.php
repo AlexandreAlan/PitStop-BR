@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.15.2';
+const APP_VERSION = '1.15.3';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.15.3',
+        'resumo'  => 'A "Última Média" agora mostra uma estimativa (bem sinalizada como não confirmada) mesmo sem nenhum tanque cheio no histórico, em vez de só "Aguardando" — pra quem prefere ter um número aproximado logo do que esperar o próximo abastecimento completo. As estatísticas oficiais e os alertas de consumo continuam usando só dado confirmado, sem chute nenhum.',
+    ],
     [
         'versao'  => '1.15.2',
         'resumo'  => 'A "Última Média" agora explica quando não dá pra calcular ainda: se você já tem 2+ abastecimentos mas nenhum trecho fechado, aparece "Aguardando" em vez de um "Sem dados" sem explicação — assim fica claro que falta um abastecimento com o tanque cheio marcado, não que o app quebrou.',
