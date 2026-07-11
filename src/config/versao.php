@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.15.2';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.15.2',
+        'resumo'  => 'A "Última Média" agora explica quando não dá pra calcular ainda: se você já tem 2+ abastecimentos mas nenhum trecho fechado, aparece "Aguardando" em vez de um "Sem dados" sem explicação — assim fica claro que falta um abastecimento com o tanque cheio marcado, não que o app quebrou.',
+    ],
     [
         'versao'  => '1.15.1',
         'resumo'  => 'Corrigido: o gráfico de Evolução do Consumo em Relatórios ainda podia mostrar um km/l impossível — ele tinha sua própria conta separada, que não tinha sido atualizada junto com a correção da v1.15.0. Agora usa a mesma lógica correta (respeita o tanque cheio marcado no abastecimento) em todo o app.',
