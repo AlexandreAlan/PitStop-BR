@@ -41,3 +41,8 @@ require_once __DIR__ . '/versao.php';
 require_once __DIR__ . '/../includes/functions.php';
 
 $pdo = getConexao();
+
+// Derruba a sessão se ela foi emitida antes do dono ter trocado a senha em
+// outro aparelho (ver checarRevogacaoDeSessao em auth.php) — 1 SELECT por PK
+// por request autenticado, custo desprezível pra fechar essa janela.
+checarRevogacaoDeSessao($pdo);
