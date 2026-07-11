@@ -85,7 +85,7 @@ function sanitizarCelulaCsv(string $valor): string
  * Sempre restrito aos veículos do usuário informado. Retorna a lista de
  * trechos fechados, ordenados por km_atual crescente.
  *
- * @return array<int, array{km_atual: int, km_trecho: int, litros: float, consumo: float}>
+ * @return array<int, array{data: string, km_atual: int, km_trecho: int, litros: float, consumo: float}>
  */
 function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?string $dataInicio = null, ?string $dataFim = null): array
 {
@@ -93,7 +93,7 @@ function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?strin
         . ($dataFim !== null ? ' AND r.data <= :data_fim' : '');
 
     $stmt = $pdo->prepare(
-        "SELECT r.km_atual, r.litros, r.tanque_cheio FROM registros r
+        "SELECT r.data, r.km_atual, r.litros, r.tanque_cheio FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
          WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
            AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL" . $filtroData . '
@@ -133,6 +133,7 @@ function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?strin
             $kmTrecho = $kmAtual - $kmInicioTrecho;
             if ($kmTrecho > 0 && $litrosAcumulados > 0) {
                 $trechos[] = [
+                    'data'      => (string) $linha['data'],
                     'km_atual'  => $kmAtual,
                     'km_trecho' => $kmTrecho,
                     'litros'    => $litrosAcumulados,
