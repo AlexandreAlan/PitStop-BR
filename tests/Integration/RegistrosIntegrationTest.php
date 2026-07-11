@@ -67,6 +67,60 @@ final class RegistrosIntegrationTest extends DatabaseTestCase
         $this->assertNull(calcularUltimaMedia($this->pdo, $usuarioB));
     }
 
+    public function testCalcularUltimaMediaRetornaNullComTanquesParciais(): void
+    {
+        // Reproduz o caso real que motivou a v1.15.0: nenhum dos dois
+        // abastecimentos encheu o tanque — sem um único tanque cheio
+        // confirmado, não existe ponto de partida confiável nenhum.
+        $usuarioId = $this->criarUsuario();
+        $veiculoId = $this->criarVeiculo($usuarioId);
+        $this->criarAbastecimento($veiculoId, 15716, 7.29, 50.0, null, false);
+        $this->criarAbastecimento($veiculoId, 16026, 4.49, 30.0, null, false);
+
+        $this->assertNull(calcularUltimaMedia($this->pdo, $usuarioId, $veiculoId));
+    }
+
+    // --- calcularUltimaMediaEstimativa() ------------------------------------
+
+    public function testCalcularUltimaMediaEstimativaFuncionaSemTanqueCheio(): void
+    {
+        // Mesmo caso do teste acima (nenhum tanque cheio) — a versão
+        // "estimativa" não exige tanque_cheio, é o preço de dar um número
+        // provisório em vez de esperar o próximo tanque cheio de verdade.
+        $usuarioId = $this->criarUsuario();
+        $veiculoId = $this->criarVeiculo($usuarioId);
+        $this->criarAbastecimento($veiculoId, 15716, 7.29, 50.0, null, false);
+        $this->criarAbastecimento($veiculoId, 16026, 4.49, 30.0, null, false);
+
+        $estimativa = calcularUltimaMediaEstimativa($this->pdo, $usuarioId, $veiculoId);
+
+        $this->assertEqualsWithDelta(310 / 4.49, $estimativa, 0.05);
+    }
+
+    public function testCalcularUltimaMediaEstimativaRetornaNullComUmSoAbastecimento(): void
+    {
+        $usuarioId = $this->criarUsuario();
+        $veiculoId = $this->criarVeiculo($usuarioId);
+        $this->criarAbastecimento($veiculoId, 15716, 7.29, 50.0);
+
+        $this->assertNull(calcularUltimaMediaEstimativa($this->pdo, $usuarioId, $veiculoId));
+    }
+
+    public function testCalcularUltimaMediaEstimativaRespeitaOFiltroDeVeiculoEUsuario(): void
+    {
+        $usuarioA = $this->criarUsuario();
+        $veiculoDeA = $this->criarVeiculo($usuarioA);
+        $this->criarAbastecimento($veiculoDeA, 1000, 20.0, 100.0, null, false);
+        $this->criarAbastecimento($veiculoDeA, 1400, 20.0, 100.0, null, false); // 20 km/l
+
+        $usuarioB = $this->criarUsuario();
+        $veiculoDeB = $this->criarVeiculo($usuarioB);
+
+        $this->assertSame(20.0, calcularUltimaMediaEstimativa($this->pdo, $usuarioA, $veiculoDeA));
+        // veiculoDeA pertence ao usuarioA — pedir com usuarioB não pode vazar.
+        $this->assertNull(calcularUltimaMediaEstimativa($this->pdo, $usuarioB, $veiculoDeA));
+    }
+
     // --- calcularEstatisticasVeiculo() --------------------------------------
 
     public function testCalcularEstatisticasVeiculoCalculaGastoKmECustoPorKm(): void
