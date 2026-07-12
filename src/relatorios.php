@@ -109,6 +109,29 @@ if (count($veiculos) > 1) {
     }
 }
 
+// Destaque do melhor valor por linha — só faz sentido pra consumo (maior é
+// melhor) e custo/km (menor é melhor). Km rodado e gasto não têm "melhor":
+// rodar mais ou gastar mais não é bom nem ruim, só reflete o uso.
+$melhorConsumoIdx = null;
+$melhorCustoKmIdx = null;
+foreach ($comparacaoVeiculos as $i => $c) {
+    if ($c['stats']['consumo_medio'] !== null
+        && ($melhorConsumoIdx === null || $c['stats']['consumo_medio'] > $comparacaoVeiculos[$melhorConsumoIdx]['stats']['consumo_medio'])) {
+        $melhorConsumoIdx = $i;
+    }
+    if ($c['stats']['custo_km'] !== null
+        && ($melhorCustoKmIdx === null || $c['stats']['custo_km'] < $comparacaoVeiculos[$melhorCustoKmIdx]['stats']['custo_km'])) {
+        $melhorCustoKmIdx = $i;
+    }
+}
+// Empate entre todos (ex.: só 1 tem dado) não é destaque de verdade.
+if ($melhorConsumoIdx !== null && count(array_unique(array_column(array_column($comparacaoVeiculos, 'stats'), 'consumo_medio'))) <= 1) {
+    $melhorConsumoIdx = null;
+}
+if ($melhorCustoKmIdx !== null && count(array_unique(array_column(array_column($comparacaoVeiculos, 'stats'), 'custo_km'))) <= 1) {
+    $melhorCustoKmIdx = null;
+}
+
 // Resumo: total gasto, gasto médio por dia, preço médio por litro
 $stmt = $pdo->prepare(
     'SELECT COALESCE(SUM(r.valor_pago), 0) AS total_gasto,
@@ -202,6 +225,15 @@ foreach ($veiculosParaConsumo as $vid) {
     }
 }
 usort($consumo, static fn(array $a, array $b): int => $a['km_atual'] <=> $b['km_atual']);
+
+// Consumo médio (card do topo) — só faz sentido quando o veículo é
+// inequívoco (filtro ativo, ou usuário com um único veículo), mesmo
+// critério já usado pra autonomia estimada no dashboard: misturar km/l de
+// veículos diferentes no mesmo número não diz nada de útil.
+$veiculoConsumoInequivoco = $veiculoIdFiltro ?? (count($veiculos) === 1 ? (int) $veiculos[0]['id'] : null);
+$consumoMedioCard = ($veiculoConsumoInequivoco !== null && $consumo)
+    ? round(array_sum(array_column($consumo, 'kml')) / count($consumo), 1)
+    : null;
 
 // Comparação com o consumo de fábrica — só faz sentido com 1 veículo
 // selecionado (misturar veículos diferentes no mesmo km/l não diz nada).
@@ -356,6 +388,15 @@ require __DIR__ . '/includes/header.php';
     <div class="col-6">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body p-2 text-center">
+                <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
+                <p class="text-muted small mb-1">Consumo Médio</p>
+                <p class="fw-bold mb-0 small stat-valor"><?= $consumoMedioCard !== null ? h(number_format($consumoMedioCard, 1, ',', '.')) . ' km/l' : '—' ?></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-2 text-center">
                 <span class="icone-chip icone-chip-teal mb-2" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
                 <p class="text-muted small mb-1">Custo por Km</p>
                 <p class="fw-bold mb-0 small stat-valor"><?= $custoPorKm !== null ? h(formatarMoeda($custoPorKm)) . '/km' : '—' ?></p>
@@ -466,14 +507,26 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <tr>
                         <td class="text-start ps-3 small text-muted">Consumo médio</td>
-                        <?php foreach ($comparacaoVeiculos as $c): ?>
-                        <td class="small fw-semibold"><?= $c['stats']['consumo_medio'] !== null ? h(number_format($c['stats']['consumo_medio'], 1, ',', '.')) . ' km/l' : '—' ?></td>
+                        <?php foreach ($comparacaoVeiculos as $i => $c): ?>
+                        <td class="small fw-semibold <?= $i === $melhorConsumoIdx ? 'celula-vencedora' : '' ?>">
+                            <?= $c['stats']['consumo_medio'] !== null ? h(number_format($c['stats']['consumo_medio'], 1, ',', '.')) . ' km/l' : '—' ?>
+                            <?php if ($i === $melhorConsumoIdx): ?><i class="bi bi-trophy-fill ms-1" title="Melhor consumo"></i><?php endif; ?>
+                        </td>
                         <?php endforeach; ?>
                     </tr>
                     <tr>
                         <td class="text-start ps-3 small text-muted">Custo por km</td>
+                        <?php foreach ($comparacaoVeiculos as $i => $c): ?>
+                        <td class="small fw-semibold <?= $i === $melhorCustoKmIdx ? 'celula-vencedora' : '' ?>">
+                            <?= $c['stats']['custo_km'] !== null ? h(formatarMoeda($c['stats']['custo_km'])) : '—' ?>
+                            <?php if ($i === $melhorCustoKmIdx): ?><i class="bi bi-trophy-fill ms-1" title="Menor custo"></i><?php endif; ?>
+                        </td>
+                        <?php endforeach; ?>
+                    </tr>
+                    <tr>
+                        <td class="text-start ps-3 small text-muted">Km rodado</td>
                         <?php foreach ($comparacaoVeiculos as $c): ?>
-                        <td class="small fw-semibold"><?= $c['stats']['custo_km'] !== null ? h(formatarMoeda($c['stats']['custo_km'])) : '—' ?></td>
+                        <td class="small fw-semibold"><?= $c['stats']['km_rodado'] > 0 ? h(number_format($c['stats']['km_rodado'], 0, ',', '.')) . ' km' : '—' ?></td>
                         <?php endforeach; ?>
                     </tr>
                     <tr>
@@ -503,7 +556,12 @@ require __DIR__ . '/includes/header.php';
 <script type="application/json" id="dados-relatorios"><?= json_encode([
     'gastoMes'    => ['labels' => $labelsGastoMes, 'valores' => $valoresGastoMes],
     'kmMes'       => ['labels' => $labelsKmMes, 'valores' => $valoresKmMes],
-    'consumo'     => ['labels' => $labelsConsumo, 'valores' => $valoresConsumo],
+    'consumo'     => [
+        'labels' => $labelsConsumo,
+        'valores' => $valoresConsumo,
+        'fabricaCidade' => isset($consumoFabrica['consumo_cidade_kml']) ? (float) $consumoFabrica['consumo_cidade_kml'] : null,
+        'fabricaEstrada' => isset($consumoFabrica['consumo_estrada_kml']) ? (float) $consumoFabrica['consumo_estrada_kml'] : null,
+    ],
     'categorias'  => ['labels' => $labelsCategorias, 'valores' => $valoresCategorias],
 ], $jsonFlags) ?></script>
 <script src="assets/js/relatorios.js"></script>
