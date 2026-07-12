@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.17.1';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.17.1',
+        'resumo'  => 'Relatórios ganharam mais uma leva de melhorias: novo card "Consumo Médio" no topo, o gráfico de pizza "Para Onde Vai o Dinheiro" mostra o total no centro, o gráfico de consumo desenha uma linha de referência com o consumo de fábrica quando disponível, e a tabela de comparação entre veículos destaca quem tem o melhor consumo e o menor custo por km.',
+    ],
     [
         'versao'  => '1.17.0',
         'resumo'  => 'Política de Privacidade totalmente reescrita e mais completa, com um aviso de cookies no primeiro acesso. Minha Conta ganhou um botão pra baixar uma cópia de todos os seus dados. E dados técnicos de segurança (tentativas de login, códigos de verificação) agora são apagados automaticamente depois de cumprirem sua função, em vez de ficarem guardados pra sempre.',
