@@ -49,10 +49,13 @@ services:
           cpus: "0.50"
           memory: 256M
 
-  # Roda cron/enviar_lembretes_push.php e cron/enviar_alertas_push.php de
-  # hora em hora: manda notificação push (Web Push) pra quem tem lembrete
-  # vencendo/vencido ou alerta inteligente não notificado, mesmo com o app
-  # fechado. Mesma imagem do "web", sem servir HTTP nenhum (sem ports).
+  # Roda cron/enviar_lembretes_push.php, cron/enviar_alertas_push.php e
+  # cron/limpar_dados_expirados.php de hora em hora: manda notificação push
+  # (Web Push) pra quem tem lembrete vencendo/vencido ou alerta inteligente
+  # não notificado (mesmo com o app fechado), e apaga dados técnicos que já
+  # cumpriram sua função (rate limit, tokens de uso único — minimização de
+  # retenção, LGPD Art. 6º, III). Mesma imagem do "web", sem servir HTTP
+  # nenhum (sem ports).
   cron:
     build:
       context: ./docker/php
@@ -64,7 +67,7 @@ services:
     user: "33:33"
     entrypoint: ["sh", "-c"]
     command:
-      - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; php /var/www/html/cron/enviar_alertas_push.php; sleep 3600; done"
+      - "while true; do php /var/www/html/cron/enviar_lembretes_push.php; php /var/www/html/cron/enviar_alertas_push.php; php /var/www/html/cron/limpar_dados_expirados.php; sleep 3600; done"
     volumes:
       - ./src:/var/www/html:ro
     environment:
