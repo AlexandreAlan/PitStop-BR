@@ -146,12 +146,36 @@ document.addEventListener('DOMContentLoaded', function () {
         var coresCategorias = dados.categorias.labels.map(function (nome) {
             return corPorCategoria[nome] || corReserva;
         });
+        // Total no centro da rosca — plugin inline (afterDraw), só texto,
+        // sem libs extras. Registrado só nessa instância (não globalmente),
+        // pra não vazar pros outros gráficos da página.
+        var totalCategorias = dados.categorias.valores.reduce(function (a, b) { return a + b; }, 0);
+        var pluginTotalCentro = {
+            id: 'totalCentro',
+            afterDraw: function (chart) {
+                var ctx = chart.ctx;
+                var largura = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
+                var altura = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#8a8f98';
+                ctx.font = '12px -apple-system, Segoe UI, Roboto, sans-serif';
+                ctx.fillText('Total', largura, altura - 12);
+                ctx.fillStyle = '#13151a';
+                ctx.font = 'bold 17px -apple-system, Segoe UI, Roboto, sans-serif';
+                ctx.fillText(formatarMoeda(totalCategorias), largura, altura + 8);
+                ctx.restore();
+            },
+        };
+
         new Chart(graficoCategorias, {
             type: 'doughnut',
             data: {
                 labels: dados.categorias.labels,
                 datasets: [{ data: dados.categorias.valores, backgroundColor: coresCategorias, borderWidth: 2, borderColor: '#fff' }]
             },
+            plugins: [pluginTotalCentro],
             options: {
                 plugins: {
                     legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
@@ -172,20 +196,43 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var graficoConsumo = document.getElementById('graficoConsumo');
     if (graficoConsumo) {
+        var datasetsConsumo = [{
+            label: 'Seu consumo', data: dados.consumo.valores,
+            borderColor: corPrimaria, backgroundColor: corPrimaria,
+            tension: 0.25, fill: false, pointRadius: 4, pointHoverRadius: 6,
+        }];
+
+        // Linha de referência do consumo de fábrica (cidade/estrada) — só
+        // aparece com 1 veículo filtrado com modelo vinculado (ver
+        // relatorios.php). Tracejada, cinza neutro: não compete visualmente
+        // com a linha real, é só contexto.
+        var temReferenciaFabrica = dados.consumo.fabricaCidade !== null || dados.consumo.fabricaEstrada !== null;
+        if (temReferenciaFabrica && dados.consumo.labels.length > 0) {
+            if (dados.consumo.fabricaCidade !== null) {
+                datasetsConsumo.push({
+                    label: 'Fábrica (cidade)',
+                    data: dados.consumo.labels.map(function () { return dados.consumo.fabricaCidade; }),
+                    borderColor: '#8a8f98', borderDash: [6, 4], borderWidth: 1.5,
+                    pointRadius: 0, fill: false, tension: 0,
+                });
+            }
+            if (dados.consumo.fabricaEstrada !== null) {
+                datasetsConsumo.push({
+                    label: 'Fábrica (estrada)',
+                    data: dados.consumo.labels.map(function () { return dados.consumo.fabricaEstrada; }),
+                    borderColor: '#c5c8ce', borderDash: [2, 3], borderWidth: 1.5,
+                    pointRadius: 0, fill: false, tension: 0,
+                });
+            }
+        }
+
         new Chart(graficoConsumo, {
             type: 'line',
-            data: {
-                labels: dados.consumo.labels,
-                datasets: [{
-                    label: 'km/l', data: dados.consumo.valores,
-                    borderColor: corPrimaria, backgroundColor: corPrimaria,
-                    tension: 0.25, fill: false, pointRadius: 4, pointHoverRadius: 6,
-                }]
-            },
+            data: { labels: dados.consumo.labels, datasets: datasetsConsumo },
             options: {
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { label: function (ctx) { return ctx.parsed.y.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km/l'; } } },
+                    legend: { display: temReferenciaFabrica, position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: { callbacks: { label: function (ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km/l'; } } },
                 },
                 scales: {
                     y: Object.assign({ beginAtZero: false, ticks: { callback: function (v) { return v + ' km/l'; } } }, opcoesEixoBase),
