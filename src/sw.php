@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
     '/assets/js/animacoes.js',
     '/assets/js/offline.js',
     '/assets/js/idb-outbox.js',
+    '/assets/js/cookies.js',
     '/assets/img/icon-192.png',
     '/assets/img/icon-512.png',
     '/assets/img/logo-mark.svg',
