@@ -28,7 +28,18 @@
 </div><!-- .app-shell -->
 <?php endif; ?>
 
+<div id="aviso-cookies" class="d-none">
+    <div class="aviso-cookies-caixa">
+        <p class="small mb-2 mb-sm-0">
+            Usamos só o cookie de sessão, essencial pra manter você logado — sem rastreamento, sem
+            publicidade. <a href="privacidade.php">Saiba mais</a>.
+        </p>
+        <button type="button" id="botaoAceitarCookies" class="btn btn-primary btn-sm">Entendi</button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="assets/js/cookies.js"></script>
 <?php if ($usuarioLogado !== null): ?>
 <script src="assets/js/idb-outbox.js"></script>
 <script src="assets/js/offline.js"></script>
