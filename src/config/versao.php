@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.17.1';
+const APP_VERSION = '1.17.2';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.17.2',
+        'resumo'  => 'Novo "Histórico de Abastecimentos" em Relatórios: uma lista direta com a data, km, litros e se foi tanque cheio de cada abastecimento — pra você ver na hora quando encheu o tanque e quando abasteceu de novo, sem precisar esperar o gráfico de consumo fechar.',
+    ],
     [
         'versao'  => '1.17.1',
         'resumo'  => 'Relatórios ganharam mais uma leva de melhorias: novo card "Consumo Médio" no topo, o gráfico de pizza "Para Onde Vai o Dinheiro" mostra o total no centro, o gráfico de consumo desenha uma linha de referência com o consumo de fábrica quando disponível, e a tabela de comparação entre veículos destaca quem tem o melhor consumo e o menor custo por km.',
