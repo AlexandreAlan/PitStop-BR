@@ -833,3 +833,35 @@ main.container {
         break-inside: avoid;
     }
 }
+
+/* Aviso de cookies — informativo (cookie de sessão é essencial, não exige
+   opt-in), some sozinho ao clicar e não volta (localStorage). Fica acima do
+   .bottom-nav quando ele existe (usuário logado); em telas sem bottom-nav
+   (login/cadastro) sobra só uma folga extra do rodapé, sem problema. */
+#aviso-cookies {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0));
+    z-index: 1030;
+    padding: 0 .75rem;
+}
+
+.aviso-cookies-caixa {
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--ps-dark);
+    color: #fff;
+    border-radius: var(--ps-radius-md);
+    padding: .85rem 1rem;
+    box-shadow: 0 4px 16px rgba(var(--ps-shadow-rgb), .25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.aviso-cookies-caixa a {
+    color: var(--ps-primary-light);
+}
