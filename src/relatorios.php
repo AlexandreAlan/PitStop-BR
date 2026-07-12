@@ -207,6 +207,22 @@ $bind($stmt);
 $stmt->execute();
 $kmPorPeriodo = $stmt->fetchAll();
 
+// Histórico de abastecimentos: lista crua (data, km, litros, tanque cheio),
+// independente de fechar trecho ou não — é a resposta direta pra "que dia
+// eu abasteci" e "quando abasteci de novo", sem passar pela conta de km/l
+// (que só existe quando dois abastecimentos de tanque cheio se fecham).
+$stmt = $pdo->prepare(
+    'SELECT r.data, r.km_atual, r.litros, r.tanque_cheio, r.valor_pago, r.combustivel, v.nome AS veiculo_nome
+     FROM registros r
+     INNER JOIN veiculos v ON v.id = r.veiculo_id
+     WHERE v.usuario_id = :usuario_id AND r.tipo_registro = "Abastecimento"' . $filtroVeiculoSql . '
+     ORDER BY r.data DESC, r.km_atual DESC
+     LIMIT 50'
+);
+$bind($stmt);
+$stmt->execute();
+$historicoAbastecimentos = $stmt->fetchAll();
+
 // Evolução do consumo (km/l): calcularTrechosConsumo() respeita
 // tanque_cheio (ver includes/functions.php) — um abastecimento parcial não
 // fecha trecho sozinho, seus litros ficam acumulados até o próximo tanque
@@ -541,6 +557,53 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<div class="px-1 mb-4">
+    <h6 class="text-muted mb-2">Histórico de Abastecimentos</h6>
+    <?php if (!$historicoAbastecimentos): ?>
+        <div class="estado-vazio-mini"><i class="bi bi-fuel-pump" aria-hidden="true"></i>Nenhum abastecimento registrado ainda.</div>
+    <?php else: ?>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0" style="overflow-x: auto;">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th class="small ps-3">Data</th>
+                            <?php if (count($veiculos) > 1 && $veiculoIdFiltro === null): ?><th class="small">Veículo</th><?php endif; ?>
+                            <th class="small text-end">Km</th>
+                            <th class="small text-end">Litros</th>
+                            <th class="small text-center">Tanque</th>
+                            <th class="small text-end pe-3">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($historicoAbastecimentos as $ab): ?>
+                        <tr>
+                            <td class="small ps-3"><?= h((new DateTime($ab['data']))->format('d/m/Y')) ?></td>
+                            <?php if (count($veiculos) > 1 && $veiculoIdFiltro === null): ?><td class="small text-muted"><?= h($ab['veiculo_nome']) ?></td><?php endif; ?>
+                            <td class="small text-end"><?= h(number_format((float) $ab['km_atual'], 0, ',', '.')) ?></td>
+                            <td class="small text-end"><?= h(number_format((float) $ab['litros'], 2, ',', '.')) ?> L</td>
+                            <td class="text-center">
+                                <?php if ((int) $ab['tanque_cheio'] === 1): ?>
+                                <span class="badge rounded-pill bg-success" title="Encheu o tanque"><i class="bi bi-check-lg"></i> cheio</span>
+                                <?php else: ?>
+                                <span class="badge rounded-pill bg-warning text-dark" title="Complemento parcial">parcial</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="small text-end pe-3"><?= h(formatarMoeda((float) $ab['valor_pago'])) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php if (count($historicoAbastecimentos) === 50): ?>
+            <div class="card-footer bg-white border-0 text-center py-2">
+                <p class="small text-muted mb-0">Mostrando os 50 mais recentes — filtre por período pra ver mais.</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+</div>
 
 <div class="px-1 mb-4">
     <h6 class="text-muted mb-2">Evolução do Consumo (km/l)</h6>
