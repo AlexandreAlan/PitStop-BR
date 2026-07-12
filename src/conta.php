@@ -85,6 +85,18 @@ require __DIR__ . '/includes/header.php';
 
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body p-4">
+        <h6 class="text-muted mb-1"><i class="bi bi-download me-1"></i>Meus Dados</h6>
+        <p class="small text-muted mb-3">Baixe uma cópia de tudo que você cadastrou (perfil, veículos,
+        abastecimentos, manutenções, despesas e lembretes) em um arquivo estruturado — direito de
+        portabilidade garantido pela LGPD (Art. 18, V).</p>
+        <a href="api/exportar_dados.php" class="btn btn-outline-primary w-100">
+            <i class="bi bi-download me-1"></i>Baixar meus dados (JSON)
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
         <h6 class="text-muted mb-1"><i class="bi bi-bullseye me-1"></i>Meta de Gasto Mensal</h6>
         <p class="small text-muted mb-3">Defina um teto de gasto por mês (combustível, manutenção e
         despesas somados). O painel principal mostra o progresso com uma barra colorida.</p>
