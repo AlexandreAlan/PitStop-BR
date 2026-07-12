@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.16.2';
+const APP_VERSION = '1.17.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.17.0',
+        'resumo'  => 'Política de Privacidade totalmente reescrita e mais completa, com um aviso de cookies no primeiro acesso. Minha Conta ganhou um botão pra baixar uma cópia de todos os seus dados. E dados técnicos de segurança (tentativas de login, códigos de verificação) agora são apagados automaticamente depois de cumprirem sua função, em vez de ficarem guardados pra sempre.',
+    ],
     [
         'versao'  => '1.16.2',
         'resumo'  => 'Melhorias de segurança nos bastidores: sessões antigas agora são encerradas quando você troca a senha, o código de verificação de e-mail ficou mais robusto, e o convite de novos usuários ganhou limite de envio. Sem mudança visível no uso do dia a dia.',
