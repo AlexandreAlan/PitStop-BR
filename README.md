@@ -3,7 +3,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-orange.svg)](LICENSE)
 
 Sistema web simples, focado em mobile, para registrar abastecimentos e manutenções de veículos e
 acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.br**.
@@ -284,6 +284,17 @@ grande de arquitetura (extrair a lógica de cada página pra uma função pura, 
 toda a lógica de negócio e validação que já vive em funções (`includes/functions.php`,
 `config/auth.php`, `config/csrf.php`); o comportamento HTTP das páginas em si (rotas, redirects,
 render) continua dependendo de teste manual.
+
+## Licença
+
+Este projeto usa a **Business Source License 1.1** (BSL), a mesma licença adotada por MariaDB,
+Sentry e CockroachDB — não é uma licença OSI "open source" tradicional, é "source-available": o
+código fica público e qualquer um pode ler, rodar e modificar pra uso pessoal, educacional ou
+interno, mas **não pode oferecer o PitStop BR (ou uma versão modificada dele) como produto/serviço
+hospedado competindo comercialmente**, nem revendê-lo, sem uma licença comercial separada do autor.
+A partir de **12/07/2030** (4 anos após a mudança), o código vira automaticamente MIT — totalmente
+livre, sem restrição nenhuma. Texto completo em [`LICENSE`](LICENSE); pra licenciamento comercial
+antes dessa data, contato em alexandre.basto444@gmail.com.
 
 ## Release e versionamento
 
