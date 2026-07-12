@@ -191,6 +191,18 @@ body {
     font-size: .7rem;
 }
 
+/* Tabela de Comparação entre Veículos (Relatórios) — destaque do melhor
+   valor por linha (consumo/custo por km), mesma linguagem do comparador
+   de combustível (cor teal = "esse aqui é o bom"). */
+.celula-vencedora {
+    background: rgba(var(--ps-teal-rgb), .1);
+    color: var(--ps-teal-dark);
+}
+.celula-vencedora .bi-trophy-fill {
+    color: var(--ps-teal);
+    font-size: .75rem;
+}
+
 .gasto-mes-linha {
     display: inline-flex;
     align-items: center;
