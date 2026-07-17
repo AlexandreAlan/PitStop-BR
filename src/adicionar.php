@@ -46,9 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $erros = $resultado['erros'];
 }
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 $tituloPagina = 'Adicionar Registro — PitStop BR';
 $mostrarVoltar = true;
 require __DIR__ . '/includes/header.php';
