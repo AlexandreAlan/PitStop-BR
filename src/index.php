@@ -91,7 +91,8 @@ $alertasStmt = $pdo->prepare(
 $alertasStmt->execute([':usuario_id' => $usuario['id']]);
 $alertasNaoLidos = $alertasStmt->fetchAll();
 
-$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao, v.nome AS veiculo_nome
+$sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao, v.nome AS veiculo_nome,
+                         EXISTS(SELECT 1 FROM registro_fotos rf WHERE rf.registro_id = r.id) AS tem_foto
                   FROM registros r
                   INNER JOIN veiculos v ON v.id = r.veiculo_id
                   WHERE ' . condicaoAcessoVeiculo('v')
@@ -342,6 +343,11 @@ require __DIR__ . '/includes/header.php';
                         <div class="text-muted small"><?= h($r['categoria_despesa']) ?></div>
                         <?php endif; ?>
                         <?php if ($r['descricao']): ?><div class="text-muted small fst-italic"><?= h($r['descricao']) ?></div><?php endif; ?>
+                        <?php if ($r['tem_foto']): ?>
+                        <a href="foto.php?registro_id=<?= (int) $r['id'] ?>" target="_blank" rel="noopener" class="text-muted small">
+                            <i class="bi bi-camera-fill me-1"></i>Ver comprovante
+                        </a>
+                        <?php endif; ?>
                     </div>
                     <div class="text-end registro-valor-col">
                         <div class="fw-bold mb-1 valor-registro"><?= h(formatarMoeda((float) $r['valor_pago'])) ?></div>
