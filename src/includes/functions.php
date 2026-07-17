@@ -109,11 +109,24 @@ function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?strin
     }
     $stmt->execute();
 
+    return acumularTrechosConsumo($stmt->fetchAll());
+}
+
+/**
+ * Lógica pura de fechamento de trechos (extraída de calcularTrechosConsumo
+ * pra ser reaproveitada por calcularTrechosConsumoVeiculo(), que consulta
+ * SEM o filtro de dono/colaborador — ver o porquê dessa exceção deliberada
+ * na doc dela). Mesmo comportamento, ordem e regras, só sem a query embutida.
+ *
+ * @param array<int, array{data: string, km_atual: int|string, litros: float|string, tanque_cheio: int|string}> $linhas ordenadas por km_atual ASC
+ */
+function acumularTrechosConsumo(array $linhas): array
+{
     $trechos          = [];
     $kmInicioTrecho    = null;
     $litrosAcumulados = 0.0;
 
-    foreach ($stmt->fetchAll() as $linha) {
+    foreach ($linhas as $linha) {
         $kmAtual     = (int) $linha['km_atual'];
         $litros      = (float) $linha['litros'];
         $tanqueCheio = (bool) $linha['tanque_cheio'];
@@ -146,6 +159,125 @@ function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?strin
     }
 
     return $trechos;
+}
+
+/**
+ * Igual calcularTrechosConsumo(), mas SEM filtro de dono/colaborador —
+ * exceção deliberada, de uso exclusivo do benchmark anônimo
+ * (calcularBenchmarkConsumo()), que precisa olhar veículos de QUALQUER
+ * conta pra montar a média agregada de "outros veículos parecidos". Nunca
+ * expor o retorno desta função (por veículo) diretamente pra nenhum
+ * usuário — só o agregado (média/percentil) sai pra fora, em
+ * calcularBenchmarkConsumo().
+ */
+function calcularTrechosConsumoVeiculo(PDO $pdo, int $veiculoId): array
+{
+    $stmt = $pdo->prepare(
+        "SELECT data, km_atual, litros, tanque_cheio FROM registros
+         WHERE veiculo_id = :veiculo_id AND tipo_registro = 'Abastecimento' AND litros IS NOT NULL
+         ORDER BY km_atual ASC"
+    );
+    $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+    $stmt->execute();
+
+    return acumularTrechosConsumo($stmt->fetchAll());
+}
+
+const BENCHMARK_CONSUMO_MIN_AMOSTRA = 5; // k-anonimato: não mostra nada com menos de 5 OUTROS veículos no mesmo segmento
+
+/**
+ * "Como você está vs a média": compara o consumo médio do veículo com o de
+ * OUTROS veículos do mesmo segmento (mesmo tipo — Moto/Carro/Outro — e
+ * mesmo combustível predominante, pra não misturar consumo de gasolina com
+ * etanol/diesel/GNV, que não são comparáveis). Sempre agregado — nunca
+ * expõe o consumo de nenhum outro veículo/usuário individualmente, e exige
+ * uma amostra mínima (BENCHMARK_CONSUMO_MIN_AMOSTRA) de outros veículos
+ * antes de mostrar qualquer número, pra não virar, na prática, "o consumo
+ * daquele outro veículo específico" quando a amostra é pequena demais.
+ *
+ * Retorna null se o próprio veículo não tem consumo calculável, ou se não
+ * há amostra suficiente de outros veículos no mesmo segmento.
+ */
+function calcularBenchmarkConsumo(PDO $pdo, int $usuarioId, int $veiculoId): ?array
+{
+    if (!usuarioTemAcessoVeiculo($pdo, $usuarioId, $veiculoId)) {
+        return null;
+    }
+
+    $trechosProprios = calcularTrechosConsumoVeiculo($pdo, $veiculoId);
+    if (!$trechosProprios) {
+        return null;
+    }
+    $consumosProprios = array_column($trechosProprios, 'consumo');
+    $seuConsumo = array_sum($consumosProprios) / count($consumosProprios);
+
+    $veiculoStmt = $pdo->prepare('SELECT tipo FROM veiculos WHERE id = :id');
+    $veiculoStmt->execute([':id' => $veiculoId]);
+    $tipo = $veiculoStmt->fetchColumn();
+    if ($tipo === false) {
+        return null;
+    }
+
+    // Combustível predominante do próprio veículo: o do abastecimento mais
+    // recente (por km) — critério simples, evita ter que calcular moda.
+    $combustivelStmt = $pdo->prepare(
+        "SELECT combustivel FROM registros
+         WHERE veiculo_id = :veiculo_id AND tipo_registro = 'Abastecimento'
+         ORDER BY km_atual DESC LIMIT 1"
+    );
+    $combustivelStmt->execute([':veiculo_id' => $veiculoId]);
+    $combustivel = $combustivelStmt->fetchColumn();
+    if ($combustivel === false) {
+        return null;
+    }
+
+    // Outros veículos do mesmo segmento (tipo + combustível predominante),
+    // nunca incluindo veículo do próprio usuário (nem outro veículo dele).
+    $candidatosStmt = $pdo->prepare(
+        "SELECT DISTINCT t.veiculo_id FROM (
+            SELECT r.veiculo_id,
+                   FIRST_VALUE(r.combustivel) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual DESC) AS combustivel_recente
+            FROM registros r
+            INNER JOIN veiculos v ON v.id = r.veiculo_id
+            WHERE v.tipo = :tipo AND r.tipo_registro = 'Abastecimento'
+              AND v.usuario_id != :usuario_id
+              AND NOT EXISTS (SELECT 1 FROM veiculo_compartilhamentos vc WHERE vc.veiculo_id = v.id AND vc.usuario_id = :usuario_id2)
+         ) t
+         WHERE t.combustivel_recente = :combustivel
+         LIMIT 500"
+    );
+    $candidatosStmt->bindValue(':tipo', $tipo);
+    $candidatosStmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    $candidatosStmt->bindValue(':usuario_id2', $usuarioId, PDO::PARAM_INT);
+    $candidatosStmt->bindValue(':combustivel', $combustivel);
+    $candidatosStmt->execute();
+
+    $mediasOutros = [];
+    foreach ($candidatosStmt->fetchAll(PDO::FETCH_COLUMN) as $outroVeiculoId) {
+        $trechos = calcularTrechosConsumoVeiculo($pdo, (int) $outroVeiculoId);
+        if ($trechos) {
+            $consumos = array_column($trechos, 'consumo');
+            $mediasOutros[] = array_sum($consumos) / count($consumos);
+        }
+    }
+
+    if (count($mediasOutros) < BENCHMARK_CONSUMO_MIN_AMOSTRA) {
+        return null;
+    }
+
+    $mediaOutros = array_sum($mediasOutros) / count($mediasOutros);
+    $piores = count(array_filter($mediasOutros, static fn(float $m): bool => $m <= $seuConsumo));
+    $percentil = (int) round(($piores / count($mediasOutros)) * 100);
+
+    return [
+        'seu_consumo'             => round($seuConsumo, 1),
+        'media_outros'            => round($mediaOutros, 1),
+        'diferenca_percentual'    => $mediaOutros > 0 ? (int) round((($seuConsumo - $mediaOutros) / $mediaOutros) * 100) : 0,
+        'percentil'               => $percentil,
+        'amostra'                 => count($mediasOutros),
+        'tipo'                    => $tipo,
+        'combustivel'             => $combustivel,
+    ];
 }
 
 /**
