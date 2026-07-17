@@ -54,7 +54,7 @@ abstract class DatabaseTestCase extends TestCase
         // usuarios/veiculos). Tabelas de catálogo (modelos_veiculos) e de
         // infraestrutura de auth não usadas nesta suíte ficam de fora.
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['alertas', 'registro_fotos', 'veiculo_passaportes', 'veiculo_convites', 'veiculo_compartilhamentos', 'registros', 'lembretes', 'push_inscricoes', 'verificacoes_email', 'redefinicoes_senha', 'convites', 'veiculos', 'usuarios'] as $tabela) {
+        foreach (['alertas', 'registro_fotos', 'veiculo_passaportes', 'veiculo_convites', 'veiculo_compartilhamentos', 'registros', 'lembretes', 'postos', 'push_inscricoes', 'verificacoes_email', 'redefinicoes_senha', 'convites', 'veiculos', 'usuarios'] as $tabela) {
             $this->pdo->exec("TRUNCATE TABLE {$tabela}");
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
