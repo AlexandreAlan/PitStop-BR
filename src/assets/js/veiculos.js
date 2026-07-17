@@ -7,6 +7,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    document.querySelectorAll('.form-sair-compartilhamento').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!confirm(form.dataset.confirmacao || 'Confirmar?')) {
+                event.preventDefault();
+            }
+        });
+    });
+
     inicializarBuscaModelo();
 });
 
