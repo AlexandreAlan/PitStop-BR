@@ -89,9 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo, cor, placa, tanque_litros, peso_kg, criado_em FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 
 $tituloPagina = 'Veículos — PitStop BR';
 $mostrarVoltar = true;
@@ -121,7 +119,10 @@ require __DIR__ . '/includes/header.php';
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi <?= $v['tipo'] === 'Moto' ? 'bi-bicycle' : 'bi-car-front' ?> fs-4 text-muted"></i>
                     <div>
-                        <div class="fw-semibold"><?= h($v['nome']) ?></div>
+                        <div class="fw-semibold">
+                            <?= h($v['nome']) ?>
+                            <?php if (!$v['e_dono']): ?><span class="badge bg-info text-dark ms-1">Compartilhado</span><?php endif; ?>
+                        </div>
                         <div class="text-muted small">
                             <?= h($v['tipo']) ?><?= $v['cor'] ? ' · ' . h($v['cor']) : '' ?><?= $v['placa'] ? ' · ' . h($v['placa']) : '' ?>
                             <?php if ($v['tanque_litros']): ?> · tanque <?= h((string) $v['tanque_litros']) ?>L<?php endif; ?>
@@ -129,6 +130,13 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </div>
                 <div class="text-end">
+                    <?php if ($v['e_dono']): ?>
+                    <a href="veiculo_compartilhar.php?veiculo_id=<?= (int) $v['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Compartilhar com outra conta">
+                        <i class="bi bi-people"></i>
+                    </a>
+                    <a href="passaporte.php?veiculo_id=<?= (int) $v['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Passaporte do veículo (link público)">
+                        <i class="bi bi-qr-code"></i>
+                    </a>
                     <a href="veiculo_editar.php?id=<?= (int) $v['id'] ?>" class="btn btn-sm btn-outline-secondary py-0 px-1">
                         <i class="bi bi-pencil"></i>
                     </a>
@@ -139,6 +147,16 @@ require __DIR__ . '/includes/header.php';
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
+                    <?php else: ?>
+                    <form method="post" action="veiculo_compartilhar.php" class="form-sair-compartilhamento d-inline" data-confirmacao="Sair deste veículo compartilhado? Você deixa de ver e registrar dados dele.">
+                        <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+                        <input type="hidden" name="veiculo_id" value="<?= (int) $v['id'] ?>">
+                        <input type="hidden" name="acao" value="sair">
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Sair do compartilhamento">
+                            <i class="bi bi-box-arrow-left"></i>
+                        </button>
+                    </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
