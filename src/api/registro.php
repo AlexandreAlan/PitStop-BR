@@ -48,4 +48,18 @@ $inserido = inserirRegistro($pdo, $resultado['valores'], $clientUuid);
 if ($inserido['novo']) {
     detectarAnomaliasRegistro($pdo, $usuario['id'], $resultado['valores'], $inserido['id']);
 }
-echo json_encode(['ok' => true, 'id' => $inserido['id']]);
+
+// Foto de comprovante: mesmo campo (foto_base64) do formulário clássico,
+// só que aqui chega via JSON — funciona tanto no envio direto quanto no
+// replay da fila offline (ver assets/js/idb-outbox.js), sem endpoint à
+// parte. Falha na foto não derruba o registro, que já foi salvo.
+$avisoFoto = null;
+$fotoBase64 = isset($corpo['foto_base64']) ? (string) $corpo['foto_base64'] : '';
+if ($fotoBase64 !== '') {
+    $resultadoFoto = salvarFotoRegistro($pdo, $usuario['id'], $inserido['id'], $fotoBase64);
+    if (!$resultadoFoto['ok']) {
+        $avisoFoto = $resultadoFoto['erro'];
+    }
+}
+
+echo json_encode(['ok' => true, 'id' => $inserido['id'], 'aviso_foto' => $avisoFoto]);
