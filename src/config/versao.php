@@ -7,9 +7,13 @@ declare(strict_types=1);
  * é o que aparece pro usuário no aviso de atualização (não é o CHANGELOG
  * técnico do README).
  */
-const APP_VERSION = '1.17.2';
+const APP_VERSION = '1.18.0';
 
 const APP_CHANGELOG = [
+    [
+        'versao'  => '1.18.0',
+        'resumo'  => 'Seis novidades: (1) Passaporte do Veículo — gere um link público (em Veículos) com o histórico completo do carro pra mostrar na hora de vender; (2) Compartilhar veículo — convide outra conta (ex.: cônjuge) pra registrar e ver os abastecimentos do mesmo carro; (3) Foto do comprovante — anexe a foto da nota ou da bomba em cada abastecimento ou despesa, funciona até offline; (4) Importar histórico — suba uma planilha CSV com abastecimentos antigos direto em Relatórios; (5) Postos favoritos — cadastre onde você costuma abastecer e compare o preço médio entre eles; (6) Comparação com a média — Relatórios agora mostra como seu consumo está em relação a outros veículos parecidos (sempre com dado anônimo e agregado, nunca de outra conta específica).',
+    ],
     [
         'versao'  => '1.17.2',
         'resumo'  => 'Novo "Histórico de Abastecimentos" em Relatórios: uma lista direta com a data, km, litros e se foi tanque cheio de cada abastecimento — pra você ver na hora quando encheu o tanque e quando abasteceu de novo, sem precisar esperar o gráfico de consumo fechar.',
