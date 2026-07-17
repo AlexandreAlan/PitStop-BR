@@ -885,6 +885,103 @@ function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
     ];
 }
 
+// --- Importação de histórico via CSV -----------------------------------------
+// Caminho inverso da exportação CSV de relatorios.php (mesmas 9 colunas,
+// mesmo delimitador ';', mesma formatação de data/número). Todas as linhas
+// importadas vão pro MESMO veículo escolhido na tela (importar.php) — a
+// coluna "Veiculo" do CSV é só informativa aqui, não é usada pra rotear
+// automaticamente entre veículos: decisão deliberada, casar nomes de
+// veículo por texto é frágil (duplicidade, apelido diferente) e um alvo
+// único e explícito é mais seguro (nunca insere num veículo que o usuário
+// não escolheu na hora).
+
+const CSV_IMPORTACAO_CABECALHO = ['Data', 'Veiculo', 'Tipo', 'Combustivel/Categoria', 'Litros', 'Km', 'TanqueCheio', 'Valor (R$)', 'Descricao'];
+const CSV_IMPORTACAO_MAX_LINHAS = 2000;
+
+/**
+ * Quebra o texto CSV em linhas de colunas (delimitador ';', mesmo da
+ * exportação), removendo BOM/cabeçalho. Não valida conteúdo — só a forma.
+ *
+ * @return array{ok: bool, erro?: string, linhas?: array<int, array<int, string>>}
+ */
+function analisarCsvImportacao(string $conteudo): array
+{
+    $conteudo = preg_replace('/^\xEF\xBB\xBF/', '', $conteudo) ?? $conteudo; // remove BOM, se vier
+    $conteudo = str_replace("\r\n", "\n", $conteudo);
+    $linhasBrutas = array_values(array_filter(explode("\n", $conteudo), static fn(string $l): bool => trim($l) !== ''));
+
+    if (!$linhasBrutas) {
+        return ['ok' => false, 'erro' => 'Arquivo vazio.'];
+    }
+    if (count($linhasBrutas) - 1 > CSV_IMPORTACAO_MAX_LINHAS) {
+        return ['ok' => false, 'erro' => 'Arquivo com mais de ' . CSV_IMPORTACAO_MAX_LINHAS . ' linhas de dados — divida em arquivos menores.'];
+    }
+
+    $linhas = array_map(static fn(string $l): array => str_getcsv($l, ';'), $linhasBrutas);
+
+    $cabecalho = array_map('trim', $linhas[0]);
+    if ($cabecalho !== CSV_IMPORTACAO_CABECALHO) {
+        return ['ok' => false, 'erro' => 'Cabeçalho do CSV não bate com o esperado (exporte de novo em Relatórios pra garantir o formato certo).'];
+    }
+
+    return ['ok' => true, 'linhas' => array_slice($linhas, 1)];
+}
+
+/**
+ * Valida (e, se pedido, converte pros valores prontos de inserirRegistro())
+ * uma linha de dados do CSV de importação. Reaproveita validarRegistro()
+ * pra whitelist/limites — mesma regra de negócio do formulário/API, sem
+ * duplicar validação.
+ *
+ * @param array<int, string> $colunas
+ * @return array{ok: bool, erro?: string, valores?: array}
+ */
+function validarLinhaCsvImportacao(PDO $pdo, int $usuarioId, int $veiculoId, array $colunas): array
+{
+    if (count($colunas) !== count(CSV_IMPORTACAO_CABECALHO)) {
+        return ['ok' => false, 'erro' => 'Número de colunas inválido (esperado ' . count(CSV_IMPORTACAO_CABECALHO) . ').'];
+    }
+
+    [$dataBr, , $tipo, $combustivelOuCategoria, $litrosBr, $kmBr, $tanqueCheioTexto, $valorBr, $descricao] = $colunas;
+
+    $data = DateTime::createFromFormat('d/m/Y', trim($dataBr));
+    if (!$data) {
+        return ['ok' => false, 'erro' => 'Data inválida (esperado dd/mm/aaaa).'];
+    }
+
+    $paraFloat = static function (string $valor): ?float {
+        $valor = trim($valor);
+        if ($valor === '') {
+            return null;
+        }
+        $normalizado = str_replace(['.', ','], ['', '.'], $valor);
+        return is_numeric($normalizado) ? (float) $normalizado : null;
+    };
+
+    $tipoNormalizado = trim($tipo);
+    $tanqueCheioTexto = mb_strtolower(trim($tanqueCheioTexto));
+
+    $dados = [
+        'veiculo_id'        => (string) $veiculoId,
+        'data'              => $data->format('Y-m-d'),
+        'km_atual'          => trim($kmBr),
+        'tipo_registro'     => $tipoNormalizado,
+        'combustivel'       => $tipoNormalizado === 'Abastecimento' ? trim($combustivelOuCategoria) : '',
+        'litros'            => $tipoNormalizado === 'Abastecimento' ? (string) ($paraFloat($litrosBr) ?? '') : '',
+        'tanque_cheio'      => in_array($tanqueCheioTexto, ['parcial', '0', 'nao', 'não'], true) ? '0' : '1',
+        'categoria_despesa' => $tipoNormalizado === 'Despesa' ? trim($combustivelOuCategoria) : '',
+        'valor_pago'        => (string) ($paraFloat($valorBr) ?? ''),
+        'descricao'         => trim($descricao),
+    ];
+
+    $resultado = validarRegistro($pdo, $usuarioId, $dados);
+    if (!$resultado['ok']) {
+        return ['ok' => false, 'erro' => implode(' ', $resultado['erros'])];
+    }
+
+    return ['ok' => true, 'valores' => $resultado['valores']];
+}
+
 // --- Foto de comprovante -----------------------------------------------------
 // Anexo opcional (nota fiscal/recibo) num registro, guardado como BLOB no
 // MySQL — ver db/migrations/0009_registro_fotos.sql pro porquê de não ser
