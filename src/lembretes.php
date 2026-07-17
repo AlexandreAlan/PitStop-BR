@@ -4,9 +4,7 @@ require_once __DIR__ . '/config/bootstrap.php';
 
 $usuario = exigirLogin();
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 
 $erros = [];
 $dados = [
@@ -41,10 +39,11 @@ $lembretesStmt = $pdo->prepare(
             (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
      FROM lembretes l
      INNER JOIN veiculos v ON v.id = l.veiculo_id
-     WHERE v.usuario_id = :usuario_id AND l.concluido_em IS NULL
+     WHERE " . condicaoAcessoVeiculo('v') . " AND l.concluido_em IS NULL
      ORDER BY l.criado_em DESC"
 );
-$lembretesStmt->execute([':usuario_id' => $usuario['id']]);
+bindAcessoVeiculo($lembretesStmt, $usuario['id']);
+$lembretesStmt->execute();
 $lembretes = $lembretesStmt->fetchAll();
 
 $prioridadeStatus = ['vencido' => 0, 'proximo' => 1, 'ok' => 2];
