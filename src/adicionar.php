@@ -14,6 +14,7 @@ $dados = [
     'km_atual'          => '',
     'tipo_registro'     => 'Abastecimento',
     'combustivel'       => '',
+    'posto_id'          => '',
     'litros'            => '',
     'tanque_cheio'      => '1',
     'categoria_despesa' => '',
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['km_atual']          = (string) ($_POST['km_atual'] ?? '');
     $dados['tipo_registro']     = (string) ($_POST['tipo_registro'] ?? '');
     $dados['combustivel']       = (string) ($_POST['combustivel'] ?? '');
+    $dados['posto_id']          = (string) ($_POST['posto_id'] ?? '');
     $dados['litros']            = (string) ($_POST['litros'] ?? '');
     $dados['tanque_cheio']      = isset($_POST['tanque_cheio']) ? '1' : '0';
     $dados['categoria_despesa'] = (string) ($_POST['categoria_despesa'] ?? '');
@@ -59,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $veiculos = veiculosAcessiveis($pdo, $usuario['id']);
+$postos = listarPostos($pdo, $usuario['id']);
 $tituloPagina = 'Adicionar Registro — PitStop BR';
 $mostrarVoltar = true;
 require __DIR__ . '/includes/header.php';
@@ -136,6 +139,21 @@ require __DIR__ . '/includes/header.php';
         <label class="form-check-label" for="tanqueCheio">Encheu o tanque</label>
         <div class="form-text">Desmarque se foi só um complemento — sem isso o km/l fica errado.</div>
     </div>
+
+    <?php if ($postos): ?>
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
+        <label class="form-label">Posto (opcional)</label>
+        <select name="posto_id" class="form-select form-select-lg">
+            <option value="">Não informado</option>
+            <?php foreach ($postos as $p): ?>
+            <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $dados['posto_id'] ? 'selected' : '' ?>>
+                <?= $p['favorito'] ? '★ ' : '' ?><?= h($p['nome']) ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        <div class="form-text"><a href="postos.php">Gerenciar postos</a></div>
+    </div>
+    <?php endif; ?>
 
     <div class="mb-3 campo-despesa <?= $dados['tipo_registro'] !== 'Despesa' ? 'd-none' : '' ?>">
         <label class="form-label">Categoria da Despesa</label>
