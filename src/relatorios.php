@@ -114,6 +114,11 @@ if (count($veiculos) > 1) {
     }
 }
 
+// Preço médio por litro pago em cada posto, no mesmo recorte de
+// veículo/período do restante da página (ver precoMedioPorPosto()).
+$precoPorPosto = precoMedioPorPosto($pdo, $usuario['id'], $veiculoIdFiltro, $dataInicioFiltro, $dataFimFiltro);
+$menorPrecoPosto = $precoPorPosto ? min(array_column($precoPorPosto, 'preco_medio_litro')) : null;
+
 // Destaque do melhor valor por linha — só faz sentido pra consumo (maior é
 // melhor) e custo/km (menor é melhor). Km rodado e gasto não têm "melhor":
 // rodar mais ou gastar mais não é bom nem ruim, só reflete o uso.
@@ -563,6 +568,45 @@ require __DIR__ . '/includes/header.php';
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($precoPorPosto): ?>
+<div class="px-1 mb-4">
+    <h6 class="text-muted mb-2">Preço Médio por Posto</h6>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0" style="overflow-x: auto;">
+            <table class="table table-sm mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th class="small ps-3">Posto</th>
+                        <th class="small text-end">Abastecimentos</th>
+                        <th class="small text-end">Preço médio/L</th>
+                        <th class="small text-end pe-3">Último</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($precoPorPosto as $p): ?>
+                    <tr>
+                        <td class="small ps-3">
+                            <?php if ($p['favorito']): ?><i class="bi bi-star-fill text-warning me-1" title="Favorito"></i><?php endif; ?>
+                            <?= h($p['nome']) ?>
+                        </td>
+                        <td class="small text-end"><?= (int) $p['total_abastecimentos'] ?></td>
+                        <td class="small text-end fw-semibold <?= (float) $p['preco_medio_litro'] === $menorPrecoPosto ? 'celula-vencedora' : '' ?>">
+                            <?= h(formatarMoeda((float) $p['preco_medio_litro'])) ?>
+                            <?php if ((float) $p['preco_medio_litro'] === $menorPrecoPosto): ?><i class="bi bi-trophy-fill ms-1" title="Menor preço médio"></i><?php endif; ?>
+                        </td>
+                        <td class="small text-end pe-3"><?= h((new DateTime($p['ultimo_abastecimento']))->format('d/m/Y')) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white border-0 py-2">
+            <p class="small text-muted mb-0">Considera só abastecimentos com posto informado. <a href="postos.php">Gerenciar postos</a></p>
         </div>
     </div>
 </div>
