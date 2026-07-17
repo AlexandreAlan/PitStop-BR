@@ -64,7 +64,7 @@ $bind = function (PDOStatement $stmt) use ($usuario, $veiculoIdFiltro, $dataInic
 
 if (($_GET['formato'] ?? '') === 'csv') {
     $stmt = $pdo->prepare(
-        'SELECT r.data, v.nome AS veiculo, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao
+        'SELECT r.data, v.nome AS veiculo, r.tipo_registro, r.combustivel, r.litros, r.tanque_cheio, r.km_atual, r.categoria_despesa, r.valor_pago, r.descricao
          FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
          WHERE ' . condicaoAcessoVeiculo('v') . $filtroVeiculoSql . '
@@ -78,7 +78,12 @@ if (($_GET['formato'] ?? '') === 'csv') {
     header('Content-Disposition: attachment; filename="pitstop-relatorio-' . date('Y-m-d') . '.csv"');
     $saida = fopen('php://output', 'w');
     fwrite($saida, "\xEF\xBB\xBF"); // BOM pra abrir certinho com acentos no Excel
-    fputcsv($saida, ['Data', 'Veiculo', 'Tipo', 'Combustivel/Categoria', 'Litros', 'Valor (R$)', 'Descricao'], ';');
+    // Formato usado também na importação (importar.php) — ver
+    // importarLinhaCsv() em includes/functions.php. Km e TanqueCheio entram
+    // aqui pra tornar a exportação de fato reimportável: sem o km (campo
+    // obrigatório em registros), um CSV exportado não dava pra voltar pro
+    // sistema de jeito nenhum.
+    fputcsv($saida, ['Data', 'Veiculo', 'Tipo', 'Combustivel/Categoria', 'Litros', 'Km', 'TanqueCheio', 'Valor (R$)', 'Descricao'], ';');
     foreach ($linhasExportacao as $l) {
         fputcsv($saida, [
             (new DateTime($l['data']))->format('d/m/Y'),
@@ -86,6 +91,8 @@ if (($_GET['formato'] ?? '') === 'csv') {
             $l['tipo_registro'],
             $l['combustivel'] ?? $l['categoria_despesa'] ?? '',
             $l['litros'] !== null ? number_format((float) $l['litros'], 2, ',', '.') : '',
+            (string) (int) $l['km_atual'],
+            $l['tipo_registro'] === 'Abastecimento' ? ((int) $l['tanque_cheio'] === 1 ? 'cheio' : 'parcial') : '',
             number_format((float) $l['valor_pago'], 2, ',', '.'),
             sanitizarCelulaCsv((string) $l['descricao']),
         ], ';');
@@ -375,6 +382,9 @@ require __DIR__ . '/includes/header.php';
             <i class="bi bi-file-earmark-pdf me-1"></i>PDF
         </button>
     </div>
+    <a href="importar.php" class="btn btn-outline-secondary btn-sm w-100 mt-2">
+        <i class="bi bi-upload me-1"></i>Importar Histórico (CSV)
+    </a>
 </form>
 
 <div class="row gx-2 px-1 mb-3">
