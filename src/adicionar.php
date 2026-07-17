@@ -39,7 +39,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($resultado['ok']) {
         $inserido = inserirRegistro($pdo, $resultado['valores']);
         detectarAnomaliasRegistro($pdo, $usuario['id'], $resultado['valores'], $inserido['id']);
-        flashSet('sucesso', 'Registro salvo com sucesso.');
+
+        $mensagem = 'Registro salvo com sucesso.';
+        $fotoBase64 = (string) ($_POST['foto_base64'] ?? '');
+        if ($fotoBase64 !== '') {
+            $resultadoFoto = salvarFotoRegistro($pdo, $usuario['id'], $inserido['id'], $fotoBase64);
+            if (!$resultadoFoto['ok']) {
+                // O registro em si já foi salvo — a foto é um extra opcional,
+                // uma falha nela não pode derrubar o registro inteiro.
+                $mensagem .= ' Porém, a foto não pôde ser anexada: ' . $resultadoFoto['erro'];
+            }
+        }
+
+        flashSet('sucesso', $mensagem);
         header('Location: index.php');
         exit;
     }
@@ -145,11 +157,25 @@ require __DIR__ . '/includes/header.php';
         <input type="text" name="descricao" maxlength="255" class="form-control form-control-lg" value="<?= h($dados['descricao']) ?>" placeholder="Ex: Troca de óleo">
     </div>
 
+    <div class="mb-4">
+        <label class="form-label">Foto do comprovante (opcional)</label>
+        <input type="file" accept="image/*" capture="environment" id="campoFotoComprovante" class="form-control form-control-lg">
+        <input type="hidden" name="foto_base64" id="campoFotoBase64">
+        <div class="form-text">A foto é compactada no aparelho antes de enviar — funciona até sem internet, sincroniza quando a conexão voltar.</div>
+        <div id="previaFotoComprovante" class="mt-2 d-none">
+            <img id="previaFotoComprovanteImg" alt="Prévia da foto do comprovante" class="img-thumbnail" style="max-height: 160px;">
+            <button type="button" class="btn btn-sm btn-outline-danger d-block mt-1" id="botaoRemoverFotoComprovante">
+                <i class="bi bi-trash me-1"></i>Remover foto
+            </button>
+        </div>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-lg w-100 mb-4">
         <i class="bi bi-check-lg me-1"></i>Salvar Registro
     </button>
 </form>
 <?php endif; ?>
 
+<script src="assets/js/foto-comprovante.js"></script>
 <script src="assets/js/adicionar.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
