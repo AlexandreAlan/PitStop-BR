@@ -4,9 +4,7 @@ require_once __DIR__ . '/config/bootstrap.php';
 
 $usuario = exigirLogin();
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 
 $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?: null;
 
@@ -52,7 +50,7 @@ function formatarRotuloPeriodo(string $dataStr, string $agrupamento, array $mese
 }
 
 $bind = function (PDOStatement $stmt) use ($usuario, $veiculoIdFiltro, $dataInicioFiltro, $dataFimFiltro): void {
-    $stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuario['id']);
     if ($veiculoIdFiltro !== null) {
         $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
     }
@@ -69,7 +67,7 @@ if (($_GET['formato'] ?? '') === 'csv') {
         'SELECT r.data, v.nome AS veiculo, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao
          FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
+         WHERE ' . condicaoAcessoVeiculo('v') . $filtroVeiculoSql . '
          ORDER BY r.data'
     );
     $bind($stmt);
@@ -141,7 +139,7 @@ $stmt = $pdo->prepare(
             COALESCE(SUM(CASE WHEN r.tipo_registro = "Abastecimento" THEN r.valor_pago ELSE 0 END), 0) AS total_gasto_combustivel
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
-     WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql
+     WHERE ' . condicaoAcessoVeiculo('v') . $filtroVeiculoSql
 );
 $bind($stmt);
 $stmt->execute();
@@ -170,7 +168,7 @@ $stmt = $pdo->prepare(
                r.valor_pago
         FROM registros r
         INNER JOIN veiculos v ON v.id = r.veiculo_id
-        WHERE v.usuario_id = :usuario_id" . $filtroVeiculoSql . '
+        WHERE " . condicaoAcessoVeiculo('v') . $filtroVeiculoSql . '
      ) t
      GROUP BY categoria ORDER BY total DESC'
 );
@@ -183,7 +181,7 @@ $stmt = $pdo->prepare(
     'SELECT ' . $grupoDataSql . ' AS periodo, SUM(r.valor_pago) AS total
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
-     WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
+     WHERE ' . condicaoAcessoVeiculo('v') . $filtroVeiculoSql . '
      GROUP BY periodo ORDER BY periodo'
 );
 $bind($stmt);
@@ -198,7 +196,7 @@ $stmt = $pdo->prepare(
                LAG(r.km_atual) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual) AS km_anterior
         FROM registros r
         INNER JOIN veiculos v ON v.id = r.veiculo_id
-        WHERE v.usuario_id = :usuario_id' . $filtroVeiculoSql . '
+        WHERE ' . condicaoAcessoVeiculo('v') . $filtroVeiculoSql . '
      ) t
      WHERE km_anterior IS NOT NULL
      GROUP BY periodo ORDER BY periodo'
@@ -215,7 +213,7 @@ $stmt = $pdo->prepare(
     'SELECT r.data, r.km_atual, r.litros, r.tanque_cheio, r.valor_pago, r.combustivel, v.nome AS veiculo_nome
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
-     WHERE v.usuario_id = :usuario_id AND r.tipo_registro = "Abastecimento"' . $filtroVeiculoSql . '
+     WHERE ' . condicaoAcessoVeiculo('v') . ' AND r.tipo_registro = "Abastecimento"' . $filtroVeiculoSql . '
      ORDER BY r.data DESC, r.km_atual DESC
      LIMIT 50'
 );
@@ -259,9 +257,11 @@ if ($veiculoIdFiltro !== null) {
     $stmt = $pdo->prepare(
         'SELECT m.consumo_cidade_kml, m.consumo_estrada_kml
          FROM veiculos v INNER JOIN modelos_veiculos m ON m.id = v.modelo_veiculo_id
-         WHERE v.id = :veiculo_id AND v.usuario_id = :usuario_id'
+         WHERE v.id = :veiculo_id AND ' . condicaoAcessoVeiculo('v')
     );
-    $stmt->execute([':veiculo_id' => $veiculoIdFiltro, ':usuario_id' => $usuario['id']]);
+    $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuario['id']);
+    $stmt->execute();
     $consumoFabrica = $stmt->fetch() ?: null;
 
     if ($consumoFabrica !== null && $consumo) {
@@ -298,10 +298,10 @@ if ($dataInicioFiltro !== null && $dataFimFiltro !== null) {
     $stmtAnterior = $pdo->prepare(
         'SELECT COALESCE(SUM(r.valor_pago), 0) FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND r.data >= :data_inicio AND r.data <= :data_fim'
+         WHERE ' . condicaoAcessoVeiculo('v') . ' AND r.data >= :data_inicio AND r.data <= :data_fim'
         . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
     );
-    $stmtAnterior->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+    bindAcessoVeiculo($stmtAnterior, $usuario['id']);
     $stmtAnterior->bindValue(':data_inicio', $inicioAnterior);
     $stmtAnterior->bindValue(':data_fim', $fimAnterior);
     if ($veiculoIdFiltro !== null) {
