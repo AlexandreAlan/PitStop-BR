@@ -125,11 +125,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         bindAcessoVeiculo($upd, $usuario['id']);
         $upd->execute();
 
-        flashSet('sucesso', 'Registro atualizado com sucesso.');
+        $mensagem = 'Registro atualizado com sucesso.';
+        $fotoBase64 = (string) ($_POST['foto_base64'] ?? '');
+        $removerFoto = ($_POST['remover_foto'] ?? '0') === '1';
+        if ($fotoBase64 !== '') {
+            $resultadoFoto = salvarFotoRegistro($pdo, $usuario['id'], $id, $fotoBase64);
+            if (!$resultadoFoto['ok']) {
+                $mensagem .= ' Porém, a foto não pôde ser anexada: ' . $resultadoFoto['erro'];
+            }
+        } elseif ($removerFoto) {
+            removerFotoRegistro($pdo, $usuario['id'], $id);
+        }
+
+        flashSet('sucesso', $mensagem);
         header('Location: index.php');
         exit;
     }
 }
+
+$temFoto = temFotoRegistro($pdo, $usuario['id'], $id);
 
 $tituloPagina = 'Editar Registro — PitStop BR';
 $mostrarVoltar = true;
@@ -224,10 +238,25 @@ require __DIR__ . '/includes/header.php';
         <input type="text" name="descricao" maxlength="255" class="form-control form-control-lg" value="<?= h($dados['descricao']) ?>" placeholder="Ex: Troca de óleo">
     </div>
 
+    <div class="mb-4">
+        <label class="form-label">Foto do comprovante (opcional)</label>
+        <input type="file" accept="image/*" capture="environment" id="campoFotoComprovante" class="form-control form-control-lg">
+        <input type="hidden" name="foto_base64" id="campoFotoBase64">
+        <input type="hidden" name="remover_foto" id="campoRemoverFoto" value="0">
+        <div class="form-text">Escolher uma foto nova substitui a atual. A foto é compactada no aparelho antes de enviar.</div>
+        <div id="previaFotoComprovante" class="mt-2 <?= $temFoto ? '' : 'd-none' ?>">
+            <img id="previaFotoComprovanteImg" alt="Prévia da foto do comprovante" class="img-thumbnail" style="max-height: 160px;" src="<?= $temFoto ? h('foto.php?registro_id=' . $id) : '' ?>">
+            <button type="button" class="btn btn-sm btn-outline-danger d-block mt-1" id="botaoRemoverFotoComprovante">
+                <i class="bi bi-trash me-1"></i>Remover foto
+            </button>
+        </div>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-lg w-100 mb-4">
         <i class="bi bi-check-lg me-1"></i>Salvar Alterações
     </button>
 </form>
 
+<script src="assets/js/foto-comprovante.js"></script>
 <script src="assets/js/adicionar.js"></script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
