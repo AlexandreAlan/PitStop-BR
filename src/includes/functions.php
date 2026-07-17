@@ -885,6 +885,131 @@ function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
     ];
 }
 
+// --- Foto de comprovante -----------------------------------------------------
+// Anexo opcional (nota fiscal/recibo) num registro, guardado como BLOB no
+// MySQL — ver db/migrations/0009_registro_fotos.sql pro porquê de não ser
+// arquivo em disco. Precisa funcionar offline: o cliente compacta a imagem
+// (assets/js/adicionar.js) e manda como data URL num campo de formulário
+// comum (foto_base64) — não é upload de arquivo de verdade (file_uploads
+// continua Off, ver docker/php/php.ini), então passa pela MESMA fila
+// offline (IndexedDB) e pelo MESMO endpoint JSON (api/registro.php) que já
+// existem pros outros campos do registro, sem precisar de um passo de
+// upload à parte que pudesse falhar sozinho.
+
+const FOTO_REGISTRO_MAX_BYTES = 900000; // ~900KB decodificado — folga sobre o alvo de compressão do cliente (~300KB)
+const FOTO_REGISTRO_MIME_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Decodifica, valida (tamanho + mime real via finfo, nunca confiando no que
+ * o cliente alega) e grava a foto de um registro — substitui a anterior, se
+ * já existir. Sempre escopado ao usuário informado (dono ou colaborador do
+ * veículo do registro, ver condicaoAcessoVeiculo) — nunca aceita anexar
+ * foto num registro que esse usuário não pode ver/editar.
+ *
+ * Aceita tanto uma data URL completa ("data:image/jpeg;base64,...") quanto
+ * só o base64 cru, pra funcionar igual vindo do formulário quanto da fila
+ * offline (que guarda e reenvia o mesmo valor do campo do formulário).
+ */
+function salvarFotoRegistro(PDO $pdo, int $usuarioId, int $registroId, string $dataUrlOuBase64): array
+{
+    $base64 = $dataUrlOuBase64;
+    if (preg_match('#^data:[a-zA-Z0-9/+.-]+;base64,(.+)$#', $dataUrlOuBase64, $m)) {
+        $base64 = $m[1];
+    }
+
+    $binario = base64_decode($base64, true);
+    if ($binario === false || $binario === '') {
+        return ['ok' => false, 'erro' => 'Foto inválida.'];
+    }
+    if (strlen($binario) > FOTO_REGISTRO_MAX_BYTES) {
+        return ['ok' => false, 'erro' => 'Foto muito grande (máx. ~900KB depois de compactada).'];
+    }
+
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($binario);
+    if (!in_array($mime, FOTO_REGISTRO_MIME_PERMITIDOS, true)) {
+        return ['ok' => false, 'erro' => 'Formato de imagem não suportado (use JPEG, PNG ou WEBP).'];
+    }
+
+    $existe = $pdo->prepare(
+        'SELECT 1 FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE r.id = :registro_id AND ' . condicaoAcessoVeiculo('v')
+    );
+    $existe->bindValue(':registro_id', $registroId, PDO::PARAM_INT);
+    bindAcessoVeiculo($existe, $usuarioId);
+    $existe->execute();
+    if (!$existe->fetchColumn()) {
+        return ['ok' => false, 'erro' => 'Registro não encontrado.'];
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO registro_fotos (registro_id, mime_type, tamanho_bytes, dados)
+         VALUES (:registro_id, :mime_type, :tamanho_bytes, :dados)
+         ON DUPLICATE KEY UPDATE mime_type = VALUES(mime_type), tamanho_bytes = VALUES(tamanho_bytes), dados = VALUES(dados)'
+    );
+    $stmt->bindValue(':registro_id', $registroId, PDO::PARAM_INT);
+    $stmt->bindValue(':mime_type', $mime);
+    $stmt->bindValue(':tamanho_bytes', strlen($binario), PDO::PARAM_INT);
+    $stmt->bindValue(':dados', $binario, PDO::PARAM_LOB);
+    $stmt->execute();
+
+    return ['ok' => true];
+}
+
+/** Remove a foto de um registro, escopado ao dono/colaborador do veículo. */
+function removerFotoRegistro(PDO $pdo, int $usuarioId, int $registroId): void
+{
+    $stmt = $pdo->prepare(
+        'DELETE rf FROM registro_fotos rf
+         INNER JOIN registros r ON r.id = rf.registro_id
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE rf.registro_id = :registro_id AND ' . condicaoAcessoVeiculo('v')
+    );
+    $stmt->bindValue(':registro_id', $registroId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->execute();
+}
+
+/**
+ * Só checa se o registro tem foto (sem carregar o BLOB) — usada nas telas de
+ * listagem/edição pra decidir se mostra o ícone/prévia, sem o custo de
+ * carregar a imagem inteira na memória do PHP à toa.
+ */
+function temFotoRegistro(PDO $pdo, int $usuarioId, int $registroId): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT 1 FROM registro_fotos rf
+         INNER JOIN registros r ON r.id = rf.registro_id
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE rf.registro_id = :registro_id AND ' . condicaoAcessoVeiculo('v')
+    );
+    $stmt->bindValue(':registro_id', $registroId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->execute();
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Foto de um registro (mime + bytes), escopado ao dono/colaborador do
+ * veículo — usada por foto.php pra servir a imagem sem vazar a de outro
+ * usuário (IDOR).
+ */
+function buscarFotoRegistro(PDO $pdo, int $usuarioId, int $registroId): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT rf.mime_type, rf.dados FROM registro_fotos rf
+         INNER JOIN registros r ON r.id = rf.registro_id
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         WHERE rf.registro_id = :registro_id AND ' . condicaoAcessoVeiculo('v')
+    );
+    $stmt->bindValue(':registro_id', $registroId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->execute();
+    $linha = $stmt->fetch();
+
+    return $linha === false ? null : $linha;
+}
+
 // --- Passaporte do veículo -------------------------------------------------
 // Link público (sem login), read-only, com o histórico completo de um
 // veículo — pra o dono provar procedência na hora de vender (ver
