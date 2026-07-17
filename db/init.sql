@@ -272,6 +272,67 @@ CREATE TABLE IF NOT EXISTS push_inscricoes (
     INDEX idx_push_inscricoes_usuario (usuario_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Compartilhamento de veículo entre contas (ex.: casal dividindo o mesmo
+-- carro) — ver db/migrations/0008_veiculo_compartilhamento.sql.
+CREATE TABLE IF NOT EXISTS veiculo_compartilhamentos (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    veiculo_id INT UNSIGNED NOT NULL,
+    usuario_id INT UNSIGNED NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_veiculo_compartilhamentos_veiculo
+        FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_veiculo_compartilhamentos_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_veiculo_compartilhamentos (veiculo_id, usuario_id),
+    INDEX idx_veiculo_compartilhamentos_usuario (usuario_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS veiculo_convites (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    veiculo_id INT UNSIGNED NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    criado_por INT UNSIGNED NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expira_em DATETIME NOT NULL,
+    usado_em DATETIME NULL,
+    CONSTRAINT fk_veiculo_convites_veiculo
+        FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_veiculo_convites_criado_por
+        FOREIGN KEY (criado_por) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_veiculo_convites_token_hash (token_hash),
+    INDEX idx_veiculo_convites_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- "Passaporte do veículo": link público (sem login), read-only, com o
+-- histórico completo de um veículo — ver db/migrations/0007_veiculo_passaportes.sql.
+CREATE TABLE IF NOT EXISTS veiculo_passaportes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    veiculo_id INT UNSIGNED NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    criado_por INT UNSIGNED NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_veiculo_passaportes_veiculo
+        FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_veiculo_passaportes_criado_por
+        FOREIGN KEY (criado_por) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_veiculo_passaportes_veiculo (veiculo_id),
+    UNIQUE KEY uq_veiculo_passaportes_token_hash (token_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Catálogo de modelos pra autopreencher tanque/peso/consumo de fábrica ao
 -- cadastrar um veículo. Ponto de partida com os modelos mais comuns no
 -- Brasil — cresce aos poucos por INSERT direto (não tem tela de admin
