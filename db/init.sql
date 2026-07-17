@@ -150,6 +150,25 @@ CREATE TABLE IF NOT EXISTS verificacoes_email (
     INDEX idx_verificacoes_email_usuario (usuario_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Postos de combustível: lista pessoal (por conta) de "onde eu costumo
+-- abastecer", com localização opcional e marcação de favorito. Não é
+-- compartilhado entre contas que dividem um veículo (ver
+-- veiculo_compartilhamentos) — cada colaborador mantém a própria lista,
+-- mesmo registrando no mesmo veículo. Ver db/migrations/0010_postos.sql.
+CREATE TABLE IF NOT EXISTS postos (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT UNSIGNED NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    localizacao VARCHAR(255) NULL,
+    favorito TINYINT(1) NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_postos_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    INDEX idx_postos_usuario (usuario_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS registros (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     veiculo_id INT UNSIGNED NOT NULL,
@@ -157,6 +176,10 @@ CREATE TABLE IF NOT EXISTS registros (
     km_atual INT UNSIGNED NOT NULL,
     tipo_registro ENUM('Abastecimento', 'Manutencao', 'Despesa') NOT NULL,
     combustivel ENUM('Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro') NULL,
+    -- Posto onde o abastecimento foi feito (opcional) — ver
+    -- db/migrations/0010_postos.sql. NULL em qualquer tipo de registro que
+    -- não seja Abastecimento, ou quando o posto não foi informado.
+    posto_id INT UNSIGNED NULL,
     litros DECIMAL(6,2) NULL,
     -- Só relevante p/ Abastecimento: encheu o tanque (1) ou foi complemento
     -- parcial (0). Ver db/migrations/0002_tanque_cheio.sql.
@@ -174,6 +197,10 @@ CREATE TABLE IF NOT EXISTS registros (
         FOREIGN KEY (veiculo_id) REFERENCES veiculos(id)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
+    CONSTRAINT fk_registros_posto
+        FOREIGN KEY (posto_id) REFERENCES postos(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
     -- Composta com veiculo_id (não só client_uuid sozinho): um client_uuid
     -- só precisa ser único DENTRO do mesmo veículo — é o que garante que um
     -- reenvio da fila offline não duplica a linha (ver inserirRegistro()
@@ -181,6 +208,7 @@ CREATE TABLE IF NOT EXISTS registros (
     UNIQUE KEY uq_registros_client_uuid (veiculo_id, client_uuid),
     INDEX idx_registros_veiculo_km (veiculo_id, km_atual),
     INDEX idx_registros_tipo (tipo_registro),
+    INDEX idx_registros_posto (posto_id),
     CONSTRAINT chk_litros_abastecimento
         CHECK (tipo_registro <> 'Abastecimento' OR litros IS NOT NULL),
     CONSTRAINT chk_combustivel_abastecimento
