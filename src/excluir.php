@@ -20,9 +20,11 @@ if (!$id) {
 $stmt = $pdo->prepare(
     'DELETE r FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
-     WHERE r.id = :id AND v.usuario_id = :usuario_id'
+     WHERE r.id = :id AND ' . condicaoAcessoVeiculo('v')
 );
-$stmt->execute([':id' => $id, ':usuario_id' => $usuario['id']]);
+$stmt->bindValue(':id', $id, PDO::PARAM_INT);
+bindAcessoVeiculo($stmt, $usuario['id']);
+$stmt->execute();
 
 if ($stmt->rowCount() === 0) {
     flashSet('erro', 'Registro não encontrado.');
