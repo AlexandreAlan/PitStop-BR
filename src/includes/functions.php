@@ -601,6 +601,126 @@ function colaboradoresVeiculo(PDO $pdo, int $veiculoId): array
     return $stmt->fetchAll();
 }
 
+// --- Postos de combustível ----------------------------------------------------
+// Lista pessoal (por conta) de postos, com localização opcional e marcação
+// de favorito — usada no registro de abastecimento (posto_id opcional) e
+// pra comparar preço médio por posto em relatorios.php. Não é
+// compartilhada entre contas que dividem um veículo (ver
+// veiculo_compartilhamentos): cada colaborador mantém a própria lista.
+
+function listarPostos(PDO $pdo, int $usuarioId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT id, nome, localizacao, favorito FROM postos
+         WHERE usuario_id = :usuario_id ORDER BY favorito DESC, nome'
+    );
+    $stmt->execute([':usuario_id' => $usuarioId]);
+    return $stmt->fetchAll();
+}
+
+function criarPosto(PDO $pdo, int $usuarioId, string $nome, ?string $localizacao): array
+{
+    $nome = trim($nome);
+    if ($nome === '' || mb_strlen($nome) > 100) {
+        return ['ok' => false, 'erro' => 'Nome do posto inválido (máx. 100 caracteres).'];
+    }
+    $localizacao = $localizacao !== null ? trim($localizacao) : null;
+    if ($localizacao !== null && mb_strlen($localizacao) > 255) {
+        return ['ok' => false, 'erro' => 'Localização muito longa (máx. 255 caracteres).'];
+    }
+
+    $stmt = $pdo->prepare('INSERT INTO postos (usuario_id, nome, localizacao) VALUES (:usuario_id, :nome, :localizacao)');
+    $stmt->execute([
+        ':usuario_id'  => $usuarioId,
+        ':nome'        => $nome,
+        ':localizacao' => $localizacao !== '' ? $localizacao : null,
+    ]);
+
+    return ['ok' => true, 'id' => (int) $pdo->lastInsertId()];
+}
+
+/** Alterna favorito/nome/localização de um posto, escopado ao dono. */
+function atualizarPosto(PDO $pdo, int $usuarioId, int $postoId, string $nome, ?string $localizacao): array
+{
+    $nome = trim($nome);
+    if ($nome === '' || mb_strlen($nome) > 100) {
+        return ['ok' => false, 'erro' => 'Nome do posto inválido (máx. 100 caracteres).'];
+    }
+    $localizacao = $localizacao !== null ? trim($localizacao) : null;
+
+    $stmt = $pdo->prepare(
+        'UPDATE postos SET nome = :nome, localizacao = :localizacao
+         WHERE id = :id AND usuario_id = :usuario_id'
+    );
+    $stmt->execute([
+        ':nome'        => $nome,
+        ':localizacao' => $localizacao !== '' ? $localizacao : null,
+        ':id'          => $postoId,
+        ':usuario_id'  => $usuarioId,
+    ]);
+
+    return ['ok' => $stmt->rowCount() > 0];
+}
+
+function alternarFavoritoPosto(PDO $pdo, int $usuarioId, int $postoId): void
+{
+    $stmt = $pdo->prepare(
+        'UPDATE postos SET favorito = NOT favorito WHERE id = :id AND usuario_id = :usuario_id'
+    );
+    $stmt->execute([':id' => $postoId, ':usuario_id' => $usuarioId]);
+}
+
+/** Exclui um posto do usuário — registros que apontavam pra ele ficam com posto_id NULL (FK ON DELETE SET NULL). */
+function excluirPosto(PDO $pdo, int $usuarioId, int $postoId): bool
+{
+    $stmt = $pdo->prepare('DELETE FROM postos WHERE id = :id AND usuario_id = :usuario_id');
+    $stmt->execute([':id' => $postoId, ':usuario_id' => $usuarioId]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Preço médio por litro pago em cada posto, dentro do recorte de
+ * veículo/período já usado no resto de relatorios.php — só considera
+ * abastecimentos com posto informado (os sem posto não entram em nenhuma
+ * linha da comparação). Sempre restrito aos veículos acessíveis ao usuário.
+ */
+function precoMedioPorPosto(PDO $pdo, int $usuarioId, ?int $veiculoId, ?string $dataInicio, ?string $dataFim): array
+{
+    $filtro = ($veiculoId !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
+        . ($dataInicio !== null ? ' AND r.data >= :data_inicio' : '')
+        . ($dataFim !== null ? ' AND r.data <= :data_fim' : '');
+
+    $stmt = $pdo->prepare(
+        "SELECT p.id, p.nome, p.favorito,
+                COUNT(*) AS total_abastecimentos,
+                SUM(r.valor_pago) / SUM(r.litros) AS preco_medio_litro,
+                MAX(r.data) AS ultimo_abastecimento
+         FROM registros r
+         INNER JOIN veiculos v ON v.id = r.veiculo_id
+         INNER JOIN postos p ON p.id = r.posto_id
+         WHERE " . condicaoAcessoVeiculo('v') . "
+           AND p.usuario_id = :usuario_id_posto
+           AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL AND r.litros > 0" . $filtro . '
+         GROUP BY p.id, p.nome, p.favorito
+         ORDER BY preco_medio_litro ASC'
+    );
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->bindValue(':usuario_id_posto', $usuarioId, PDO::PARAM_INT);
+    if ($veiculoId !== null) {
+        $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+    }
+    if ($dataInicio !== null) {
+        $stmt->bindValue(':data_inicio', $dataInicio);
+    }
+    if ($dataFim !== null) {
+        $stmt->bindValue(':data_fim', $dataFim);
+    }
+    $stmt->execute();
+
+    return $stmt->fetchAll();
+}
+
 const COMBUSTIVEIS_PERMITIDOS = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
 const CATEGORIAS_DESPESA_PERMITIDAS = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
 
@@ -622,6 +742,8 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
     $litros           = $litrosStr === '' ? null : filter_var($litrosStr, FILTER_VALIDATE_FLOAT, ['options' => ['min_range' => 0.01]]);
     $combustivel      = in_array($dados['combustivel'] ?? '', COMBUSTIVEIS_PERMITIDOS, true) ? $dados['combustivel'] : null;
     $categoriaDespesa = in_array($dados['categoria_despesa'] ?? '', CATEGORIAS_DESPESA_PERMITIDAS, true) ? $dados['categoria_despesa'] : null;
+    $postoIdStr       = (string) ($dados['posto_id'] ?? '');
+    $postoId          = $postoIdStr === '' ? null : filter_var($postoIdStr, FILTER_VALIDATE_INT);
     // Ausente = assume tanque cheio (clientes antigos, ainda sem o campo,
     // mantêm o comportamento anterior à migração 0002). Formulários HTML
     // sempre mandam '1' ou '0' explicitamente (ver adicionar.php).
@@ -658,6 +780,17 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
     if (mb_strlen($descricao) > 255) {
         $erros[] = 'Descrição muito longa (máx. 255 caracteres).';
     }
+    if ($postoId !== null) {
+        if ($postoId === false || $postoId <= 0) {
+            $erros[] = 'Posto inválido.';
+        } else {
+            $existePosto = $pdo->prepare('SELECT 1 FROM postos WHERE id = :id AND usuario_id = :usuario_id');
+            $existePosto->execute([':id' => $postoId, ':usuario_id' => $usuarioId]);
+            if (!$existePosto->fetchColumn()) {
+                $erros[] = 'Posto não encontrado.';
+            }
+        }
+    }
 
     if ($erros) {
         return ['ok' => false, 'erros' => $erros, 'valores' => $dados];
@@ -672,6 +805,7 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
             'km_atual'          => $kmAtual,
             'tipo_registro'     => $tipoRegistro,
             'combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
+            'posto_id'          => $tipoRegistro === 'Abastecimento' ? $postoId : null,
             'litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
             'tanque_cheio'      => $tipoRegistro === 'Abastecimento' ? $tanqueCheio : true,
             'categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
@@ -703,8 +837,8 @@ function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): 
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, litros, tanque_cheio, categoria_despesa, valor_pago, descricao, client_uuid)
-         VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :litros, :tanque_cheio, :categoria_despesa, :valor_pago, :descricao, :client_uuid)'
+        'INSERT INTO registros (veiculo_id, data, km_atual, tipo_registro, combustivel, posto_id, litros, tanque_cheio, categoria_despesa, valor_pago, descricao, client_uuid)
+         VALUES (:veiculo_id, :data, :km_atual, :tipo_registro, :combustivel, :posto_id, :litros, :tanque_cheio, :categoria_despesa, :valor_pago, :descricao, :client_uuid)'
     );
     $stmt->execute([
         ':veiculo_id'        => $valores['veiculo_id'],
@@ -712,6 +846,8 @@ function inserirRegistro(PDO $pdo, array $valores, ?string $clientUuid = null): 
         ':km_atual'          => $valores['km_atual'],
         ':tipo_registro'     => $valores['tipo_registro'],
         ':combustivel'       => $valores['combustivel'],
+        // Ausente (chamadores antigos/testes que montam o array na mão) = sem posto.
+        ':posto_id'          => $valores['posto_id'] ?? null,
         ':litros'            => $valores['litros'],
         // Ausente (chamadores antigos/testes que montam o array na mão) =
         // assume cheio, preservando o comportamento anterior à migração 0002.
