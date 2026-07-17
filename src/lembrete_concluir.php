@@ -21,9 +21,11 @@ $stmt = $pdo->prepare(
     'UPDATE lembretes l
      INNER JOIN veiculos v ON v.id = l.veiculo_id
      SET l.concluido_em = NOW()
-     WHERE l.id = :id AND v.usuario_id = :usuario_id AND l.concluido_em IS NULL'
+     WHERE l.id = :id AND ' . condicaoAcessoVeiculo('v') . ' AND l.concluido_em IS NULL'
 );
-$stmt->execute([':id' => $id, ':usuario_id' => $usuario['id']]);
+$stmt->bindValue(':id', $id, PDO::PARAM_INT);
+bindAcessoVeiculo($stmt, $usuario['id']);
+$stmt->execute();
 
 if ($stmt->rowCount() === 0) {
     flashSet('erro', 'Lembrete não encontrado.');
