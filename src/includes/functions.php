@@ -95,11 +95,11 @@ function calcularTrechosConsumo(PDO $pdo, int $usuarioId, int $veiculoId, ?strin
     $stmt = $pdo->prepare(
         "SELECT r.data, r.km_atual, r.litros, r.tanque_cheio FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
+         WHERE " . condicaoAcessoVeiculo('v') . " AND v.id = :veiculo_id
            AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL" . $filtroData . '
          ORDER BY r.km_atual ASC'
     );
-    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
     $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
     if ($dataInicio !== null) {
         $stmt->bindValue(':data_inicio', $dataInicio);
@@ -160,13 +160,11 @@ function calcularUltimaMedia(PDO $pdo, int $usuarioId, ?int $veiculoId = null): 
         return $ultimo !== false ? round($ultimo['consumo'], 1) : null;
     }
 
-    // Sem veiculo_id: pega o trecho mais recente entre TODOS os veículos do
-    // usuário (cada um calculado com seu próprio corte tanque-cheio).
-    $veiculosStmt = $pdo->prepare('SELECT id FROM veiculos WHERE usuario_id = :usuario_id');
-    $veiculosStmt->execute([':usuario_id' => $usuarioId]);
-
+    // Sem veiculo_id: pega o trecho mais recente entre TODOS os veículos
+    // acessíveis ao usuário — próprios ou compartilhados (cada um calculado
+    // com seu próprio corte tanque-cheio).
     $melhorTrecho = null;
-    foreach ($veiculosStmt->fetchAll(PDO::FETCH_COLUMN) as $vid) {
+    foreach (array_column(veiculosAcessiveis($pdo, $usuarioId), 'id') as $vid) {
         $trechos = calcularTrechosConsumo($pdo, $usuarioId, (int) $vid);
         $ultimo  = end($trechos);
         if ($ultimo !== false && ($melhorTrecho === null || $ultimo['km_atual'] > $melhorTrecho['km_atual'])) {
@@ -197,11 +195,11 @@ function calcularUltimaMediaEstimativa(PDO $pdo, int $usuarioId, int $veiculoId)
     $stmt = $pdo->prepare(
         "SELECT r.km_atual, r.litros FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id
+         WHERE " . condicaoAcessoVeiculo('v') . " AND v.id = :veiculo_id
            AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL
          ORDER BY r.km_atual DESC LIMIT 2"
     );
-    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
     $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
     $stmt->execute();
     $linhas = $stmt->fetchAll();
@@ -232,7 +230,7 @@ function calcularEstatisticasVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, ?
         . ($dataFim !== null ? ' AND r.data <= :data_fim' : '');
 
     $bind = function (PDOStatement $stmt) use ($usuarioId, $veiculoId, $dataInicio, $dataFim): void {
-        $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        bindAcessoVeiculo($stmt, $usuarioId);
         $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
         if ($dataInicio !== null) {
             $stmt->bindValue(':data_inicio', $dataInicio);
@@ -245,7 +243,7 @@ function calcularEstatisticasVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, ?
     $stmt = $pdo->prepare(
         'SELECT COALESCE(SUM(r.valor_pago), 0) FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id' . $filtroData
+         WHERE ' . condicaoAcessoVeiculo('v') . ' AND v.id = :veiculo_id' . $filtroData
     );
     $bind($stmt);
     $stmt->execute();
@@ -256,7 +254,7 @@ function calcularEstatisticasVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, ?
             SELECT r.km_atual, LAG(r.km_atual) OVER (ORDER BY r.km_atual) AS km_anterior
             FROM registros r
             INNER JOIN veiculos v ON v.id = r.veiculo_id
-            WHERE v.usuario_id = :usuario_id AND v.id = :veiculo_id' . $filtroData . '
+            WHERE ' . condicaoAcessoVeiculo('v') . ' AND v.id = :veiculo_id' . $filtroData . '
          ) t WHERE km_anterior IS NOT NULL'
     );
     $bind($stmt);
@@ -320,9 +318,10 @@ function calcularConquistas(PDO $pdo, int $usuarioId): array
     $mesesStmt = $pdo->prepare(
         "SELECT DISTINCT DATE_FORMAT(r.data, '%Y-%m') AS mes
          FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id"
+         WHERE " . condicaoAcessoVeiculo('v')
     );
-    $mesesStmt->execute([':usuario_id' => $usuarioId]);
+    bindAcessoVeiculo($mesesStmt, $usuarioId);
+    $mesesStmt->execute();
     $mesesComRegistro = array_column($mesesStmt->fetchAll(), 'mes');
 
     $sequenciaMeses = 0;
@@ -338,9 +337,10 @@ function calcularConquistas(PDO $pdo, int $usuarioId): array
     // Total de abastecimentos — base dos marcos de quilometragem percorrida.
     $totalStmt = $pdo->prepare(
         "SELECT COUNT(*) FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND r.tipo_registro = 'Abastecimento'"
+         WHERE " . condicaoAcessoVeiculo('v') . " AND r.tipo_registro = 'Abastecimento'"
     );
-    $totalStmt->execute([':usuario_id' => $usuarioId]);
+    bindAcessoVeiculo($totalStmt, $usuarioId);
+    $totalStmt->execute();
     $totalAbastecimentos = (int) $totalStmt->fetchColumn();
 
     // Consumo médio do mês atual x mês anterior (só entre abastecimentos
@@ -350,13 +350,14 @@ function calcularConquistas(PDO $pdo, int $usuarioId): array
             SELECT DATE_FORMAT(r.data, '%Y-%m') AS mes, r.km_atual, r.litros,
                    LAG(r.km_atual) OVER (PARTITION BY r.veiculo_id ORDER BY r.km_atual) AS km_anterior
             FROM registros r INNER JOIN veiculos v ON v.id = r.veiculo_id
-            WHERE v.usuario_id = :usuario_id
+            WHERE " . condicaoAcessoVeiculo('v') . "
               AND r.tipo_registro = 'Abastecimento' AND r.litros IS NOT NULL
          ) t
          WHERE km_anterior IS NOT NULL AND km_atual > km_anterior
          GROUP BY mes ORDER BY mes DESC LIMIT 2"
     );
-    $consumoStmt->execute([':usuario_id' => $usuarioId]);
+    bindAcessoVeiculo($consumoStmt, $usuarioId);
+    $consumoStmt->execute();
     $consumoPorMes = $consumoStmt->fetchAll();
     $mesAtual = (new DateTime('today'))->format('Y-m');
     $economiaMes = count($consumoPorMes) === 2
@@ -368,9 +369,10 @@ function calcularConquistas(PDO $pdo, int $usuarioId): array
         "SELECT l.tipo_alvo, l.km_alvo, l.data_alvo,
                 (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
          FROM lembretes l INNER JOIN veiculos v ON v.id = l.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND l.concluido_em IS NULL"
+         WHERE " . condicaoAcessoVeiculo('v') . " AND l.concluido_em IS NULL"
     );
-    $lembretesStmt->execute([':usuario_id' => $usuarioId]);
+    bindAcessoVeiculo($lembretesStmt, $usuarioId);
+    $lembretesStmt->execute();
     $lembretesAtivos = $lembretesStmt->fetchAll();
     $temLembreteVencido = false;
     foreach ($lembretesAtivos as $l) {
@@ -407,6 +409,198 @@ function calcularConquistas(PDO $pdo, int $usuarioId): array
     ];
 }
 
+// --- Compartilhamento de veículo entre contas -------------------------------
+// Um veículo continua tendo um único dono (veiculos.usuario_id) — quem pode
+// editar/excluir o veículo, gerenciar o passaporte (link público) e
+// convidar/remover colaboradores. veiculo_compartilhamentos é a lista de
+// contas ADICIONAIS que passam a poder registrar/ver abastecimentos,
+// manutenções, despesas e lembretes desse veículo (ver
+// db/migrations/0008_veiculo_compartilhamento.sql).
+//
+// DECISÃO DE PRODUTO: o colaborador convidado enxerga o HISTÓRICO COMPLETO
+// do veículo, não só os registros a partir do convite. Dois motivos: (1) é
+// o mesmo veículo físico — esconder parte do histórico fragmentaria as
+// contas de km/l e gasto total, que dependem de uma sequência contínua de
+// odômetro; (2) o caso de uso ("casal dividindo carro") pressupõe
+// transparência mútua sobre o veículo compartilhado. Quem quiser manter um
+// histórico privado antes de compartilhar deve cadastrar um veículo novo.
+
+/**
+ * Condição SQL (a incluir num WHERE/ON já filtrado por $alias.id) que
+ * verifica se o usuário é o DONO do veículo OU um colaborador convidado.
+ * Usa dois placeholders nomeados distintos (não o mesmo nome duas vezes)
+ * porque o driver MySQL do PDO, com EMULATE_PREPARES desligado (ver
+ * conexao.php), não aceita reaproveitar um placeholder nomeado repetido na
+ * mesma query — bindAcessoVeiculo() cobre os dois com o mesmo valor.
+ */
+function condicaoAcessoVeiculo(string $alias = 'v'): string
+{
+    return "({$alias}.usuario_id = :acesso_usuario_id OR EXISTS (
+        SELECT 1 FROM veiculo_compartilhamentos vc
+        WHERE vc.veiculo_id = {$alias}.id AND vc.usuario_id = :acesso_usuario_id_vc
+    ))";
+}
+
+/** Faz o bind dos dois placeholders usados por condicaoAcessoVeiculo(). */
+function bindAcessoVeiculo(PDOStatement $stmt, int $usuarioId): void
+{
+    $stmt->bindValue(':acesso_usuario_id', $usuarioId, PDO::PARAM_INT);
+    $stmt->bindValue(':acesso_usuario_id_vc', $usuarioId, PDO::PARAM_INT);
+}
+
+/** Versão booleana pontual (um veículo específico), pra checagens simples. */
+function usuarioTemAcessoVeiculo(PDO $pdo, int $usuarioId, int $veiculoId): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT 1 FROM veiculos v WHERE v.id = :veiculo_id AND ' . condicaoAcessoVeiculo('v')
+    );
+    $stmt->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->execute();
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Todos os veículos que o usuário pode ver/usar: os próprios e os
+ * compartilhados com ele. 'compartilhado' distingue os dois na tela (ex.:
+ * "Moto do João (compartilhado)"), sem misturar dados de outros usuários —
+ * cada linha continua sendo só metadado do próprio veículo.
+ */
+function veiculosAcessiveis(PDO $pdo, int $usuarioId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT v.id, v.nome, v.tipo, v.cor, v.placa, v.tanque_litros, v.peso_kg,
+                (v.usuario_id = :usuario_id) AS e_dono
+         FROM veiculos v
+         WHERE ' . condicaoAcessoVeiculo('v') . '
+         ORDER BY v.nome'
+    );
+    $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+    bindAcessoVeiculo($stmt, $usuarioId);
+    $stmt->execute();
+
+    return array_map(static function (array $v): array {
+        $v['e_dono'] = (bool) $v['e_dono'];
+        return $v;
+    }, $stmt->fetchAll());
+}
+
+/**
+ * Convida (por e-mail) uma conta a colaborar num veículo — mesmo padrão do
+ * convite de conta (convidar.php): token de 32 bytes, só o hash fica no
+ * banco, validade de 7 dias. Só o DONO do veículo pode convidar; retorna
+ * null se $usuarioId não for dono, sem criar nada.
+ */
+function criarConviteVeiculo(PDO $pdo, int $usuarioId, int $veiculoId, string $email): ?string
+{
+    $dono = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+    $dono->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
+    if (!$dono->fetchColumn()) {
+        return null;
+    }
+
+    $token     = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+    $expiraEm  = (new DateTime())->modify('+7 days')->format('Y-m-d H:i:s');
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO veiculo_convites (veiculo_id, email, token_hash, criado_por, expira_em)
+         VALUES (:veiculo_id, :email, :token_hash, :criado_por, :expira_em)'
+    );
+    $stmt->execute([
+        ':veiculo_id' => $veiculoId,
+        ':email'      => $email,
+        ':token_hash' => $tokenHash,
+        ':criado_por' => $usuarioId,
+        ':expira_em'  => $expiraEm,
+    ]);
+
+    return $token;
+}
+
+/**
+ * Aceita um convite de veículo: cria o compartilhamento pro usuário logado
+ * e marca o convite como usado. Trava a linha (FOR UPDATE) pra garantir uso
+ * único mesmo com duas requisições simultâneas, mesmo padrão de convite.php.
+ * Retorna o veiculo_id em caso de sucesso, ou null se o token for
+ * inválido/expirado/já usado.
+ */
+function aceitarConviteVeiculo(PDO $pdo, string $token, int $usuarioId): ?int
+{
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+    $tokenHash = hash('sha256', $token);
+
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare(
+            'SELECT id, veiculo_id FROM veiculo_convites
+             WHERE token_hash = :token_hash AND usado_em IS NULL AND expira_em > NOW() FOR UPDATE'
+        );
+        $lock->execute([':token_hash' => $tokenHash]);
+        $convite = $lock->fetch();
+
+        if (!$convite) {
+            $pdo->rollBack();
+            return null;
+        }
+
+        $pdo->prepare(
+            'INSERT IGNORE INTO veiculo_compartilhamentos (veiculo_id, usuario_id) VALUES (:veiculo_id, :usuario_id)'
+        )->execute([':veiculo_id' => $convite['veiculo_id'], ':usuario_id' => $usuarioId]);
+
+        $pdo->prepare('UPDATE veiculo_convites SET usado_em = NOW() WHERE id = :id')
+            ->execute([':id' => $convite['id']]);
+
+        $pdo->commit();
+        return (int) $convite['veiculo_id'];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
+/**
+ * Remove um compartilhamento. $quemRemove pode ser o DONO do veículo
+ * (removendo qualquer colaborador) ou o próprio colaborador (saindo por
+ * conta própria) — nunca um terceiro sem relação com o veículo. Retorna
+ * true se algo foi removido.
+ */
+function removerCompartilhamentoVeiculo(PDO $pdo, int $quemRemove, int $veiculoId, int $usuarioIdRemovido): bool
+{
+    $ehDono = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+    $ehDono->execute([':id' => $veiculoId, ':usuario_id' => $quemRemove]);
+    $autorizado = (bool) $ehDono->fetchColumn() || $quemRemove === $usuarioIdRemovido;
+    if (!$autorizado) {
+        return false;
+    }
+
+    $stmt = $pdo->prepare(
+        'DELETE FROM veiculo_compartilhamentos WHERE veiculo_id = :veiculo_id AND usuario_id = :usuario_id'
+    );
+    $stmt->execute([':veiculo_id' => $veiculoId, ':usuario_id' => $usuarioIdRemovido]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/** Colaboradores atuais de um veículo (pra tela de gerenciamento do dono). */
+function colaboradoresVeiculo(PDO $pdo, int $veiculoId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT u.id, u.nome, u.email, vc.criado_em
+         FROM veiculo_compartilhamentos vc
+         INNER JOIN usuarios u ON u.id = vc.usuario_id
+         WHERE vc.veiculo_id = :veiculo_id
+         ORDER BY vc.criado_em'
+    );
+    $stmt->execute([':veiculo_id' => $veiculoId]);
+    return $stmt->fetchAll();
+}
+
 const COMBUSTIVEIS_PERMITIDOS = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
 const CATEGORIAS_DESPESA_PERMITIDAS = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
 
@@ -437,12 +631,8 @@ function validarRegistro(PDO $pdo, int $usuarioId, array $dados): array
 
     if (!$veiculoId) {
         $erros[] = 'Selecione um veículo válido.';
-    } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
-        if (!$existe->fetchColumn()) {
-            $erros[] = 'Veículo não encontrado.';
-        }
+    } elseif (!usuarioTemAcessoVeiculo($pdo, $usuarioId, $veiculoId)) {
+        $erros[] = 'Veículo não encontrado.';
     }
     if (!$dataRegistro || $dataRegistro->format('Y-m-d') !== $dataStr) {
         $erros[] = 'Data inválida.';
@@ -662,12 +852,8 @@ function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
 
     if (!$veiculoId) {
         $erros[] = 'Selecione um veículo válido.';
-    } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
-        if (!$existe->fetchColumn()) {
-            $erros[] = 'Veículo não encontrado.';
-        }
+    } elseif (!usuarioTemAcessoVeiculo($pdo, $usuarioId, $veiculoId)) {
+        $erros[] = 'Veículo não encontrado.';
     }
     if ($descricao === '' || mb_strlen($descricao) > 150) {
         $erros[] = 'Descrição inválida (máx. 150 caracteres).';
@@ -697,6 +883,100 @@ function validarLembrete(PDO $pdo, int $usuarioId, array $dados): array
             'data_alvo'  => $tipoAlvo === 'Data' ? $dataAlvo->format('Y-m-d') : null,
         ],
     ];
+}
+
+// --- Passaporte do veículo -------------------------------------------------
+// Link público (sem login), read-only, com o histórico completo de um
+// veículo — pra o dono provar procedência na hora de vender (ver
+// db/migrations/0007_veiculo_passaportes.sql). Só o hash SHA-256 do token
+// fica no banco (mesmo padrão de convites/redefinição de senha); o token
+// puro só existe uma vez, no momento em que é gerado, pra ser copiado/
+// compartilhado pelo dono — nunca fica recuperável depois.
+
+/**
+ * Gera (ou substitui, se já existir) o link público do veículo. Sempre
+ * escopado ao dono do veículo — retorna null sem tocar em nada se o veículo
+ * não existir ou não pertencer a esse usuário, prevenindo IDOR. Retorna o
+ * token em texto puro (só existe aqui, uma vez — o banco guarda só o hash).
+ */
+function criarOuRotacionarPassaporte(PDO $pdo, int $usuarioId, int $veiculoId): ?string
+{
+    $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
+    $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuarioId]);
+    if (!$existe->fetchColumn()) {
+        return null;
+    }
+
+    $token     = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO veiculo_passaportes (veiculo_id, token_hash, criado_por)
+         VALUES (:veiculo_id, :token_hash, :criado_por)
+         ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), criado_por = VALUES(criado_por)'
+    );
+    $stmt->execute([
+        ':veiculo_id' => $veiculoId,
+        ':token_hash' => $tokenHash,
+        ':criado_por' => $usuarioId,
+    ]);
+
+    return $token;
+}
+
+/** Revoga (apaga) o link público do veículo, escopado ao dono. */
+function revogarPassaporte(PDO $pdo, int $usuarioId, int $veiculoId): bool
+{
+    $stmt = $pdo->prepare(
+        'DELETE p FROM veiculo_passaportes p
+         INNER JOIN veiculos v ON v.id = p.veiculo_id
+         WHERE p.veiculo_id = :veiculo_id AND v.usuario_id = :usuario_id'
+    );
+    $stmt->execute([':veiculo_id' => $veiculoId, ':usuario_id' => $usuarioId]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/** Estado atual do link público do veículo (existe ou não), escopado ao dono. */
+function passaporteAtivo(PDO $pdo, int $usuarioId, int $veiculoId): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT 1 FROM veiculo_passaportes p
+         INNER JOIN veiculos v ON v.id = p.veiculo_id
+         WHERE p.veiculo_id = :veiculo_id AND v.usuario_id = :usuario_id'
+    );
+    $stmt->execute([':veiculo_id' => $veiculoId, ':usuario_id' => $usuarioId]);
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Resolve um token de passaporte público pro veículo/dono correspondentes,
+ * ou null se o token for inválido/inexistente. Usado pela página pública
+ * (sem autenticação) — a partir daqui, todo dado exibido é sempre filtrado
+ * por esse veiculo_id + usuario_id (dono), nunca por dado solto, o que
+ * impede o link de um veículo vazar dados de outro veículo ou de outra
+ * conta.
+ *
+ * @return array{veiculo_id: int, usuario_id: int}|null
+ */
+function buscarVeiculoPorTokenPassaporte(PDO $pdo, string $token): ?array
+{
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+    $tokenHash = hash('sha256', $token);
+
+    $stmt = $pdo->prepare(
+        'SELECT p.veiculo_id, v.usuario_id
+         FROM veiculo_passaportes p
+         INNER JOIN veiculos v ON v.id = p.veiculo_id
+         WHERE p.token_hash = :token_hash'
+    );
+    $stmt->execute([':token_hash' => $tokenHash]);
+    $linha = $stmt->fetch();
+
+    return $linha === false ? null : ['veiculo_id' => (int) $linha['veiculo_id'], 'usuario_id' => (int) $linha['usuario_id']];
 }
 
 /** Insere um lembrete já validado (ver validarLembrete); idempotente via client_uuid. */
