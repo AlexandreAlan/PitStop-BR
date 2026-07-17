@@ -281,6 +281,10 @@ if ($veiculoIdFiltro !== null) {
     }
 }
 
+// Benchmark anônimo: só com 1 veículo selecionado (mesmo critério da
+// comparação com fábrica acima) — ver calcularBenchmarkConsumo().
+$benchmarkConsumo = $veiculoIdFiltro !== null ? calcularBenchmarkConsumo($pdo, $usuario['id'], $veiculoIdFiltro) : null;
+
 $labelsGastoMes = array_map(static fn($g) => formatarRotuloPeriodo($g['periodo'], $agrupamento, $mesesAbrev), $gastoPorPeriodo);
 $valoresGastoMes = array_map(static fn($g) => (float) $g['total'], $gastoPorPeriodo);
 $labelsKmMes = array_map(static fn($k) => formatarRotuloPeriodo($k['periodo'], $agrupamento, $mesesAbrev), $kmPorPeriodo);
@@ -516,6 +520,37 @@ require __DIR__ . '/includes/header.php';
                     : 'Você está rendendo ' . abs($diferenca) . '% a menos que o consumo de cidade informado pelo fabricante.' ?>
             </p>
             <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($benchmarkConsumo !== null): ?>
+<div class="px-1 mb-4">
+    <h6 class="text-muted mb-2">Como Você Está vs. a Média</h6>
+    <div class="card shadow-sm border-0">
+        <div class="card-body py-3 px-3">
+            <div class="row text-center gx-2">
+                <div class="col-6">
+                    <p class="text-muted small mb-1">Seu consumo</p>
+                    <p class="fw-bold mb-0 stat-valor"><?= h(number_format($benchmarkConsumo['seu_consumo'], 1, ',', '.')) ?> km/l</p>
+                </div>
+                <div class="col-6">
+                    <p class="text-muted small mb-1">Média de outros veículos parecidos</p>
+                    <p class="fw-bold mb-0 stat-valor"><?= h(number_format($benchmarkConsumo['media_outros'], 1, ',', '.')) ?> km/l</p>
+                </div>
+            </div>
+            <p class="text-muted small text-center mb-0 mt-2">
+                <?= $benchmarkConsumo['diferenca_percentual'] >= 0
+                    ? 'Você está rendendo ' . abs($benchmarkConsumo['diferenca_percentual']) . '% a mais'
+                    : 'Você está rendendo ' . abs($benchmarkConsumo['diferenca_percentual']) . '% a menos' ?>
+                que a média de <?= (int) $benchmarkConsumo['amostra'] ?> outros
+                <?= h(mb_strtolower((string) $benchmarkConsumo['tipo'])) ?>s a <?= h($benchmarkConsumo['combustivel']) ?>
+                — melhor que <?= (int) $benchmarkConsumo['percentil'] ?>% deles.
+            </p>
+            <p class="text-muted small text-center mb-0 mt-2 fst-italic">
+                Comparação sempre anônima e agregada — nunca mostra o consumo de nenhum outro veículo/conta individualmente.
+            </p>
         </div>
     </div>
 </div>
