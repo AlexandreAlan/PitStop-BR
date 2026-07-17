@@ -54,7 +54,24 @@ final class SqliteFixture
             )'
         );
 
+        // Compartilhamento de veículo entre contas (ver
+        // condicaoAcessoVeiculo()/usuarioTemAcessoVeiculo() em functions.php) —
+        // vazia na maioria dos testes, só populada nos que cobrem colaborador.
+        $pdo->exec(
+            'CREATE TABLE veiculo_compartilhamentos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER NOT NULL,
+                usuario_id INTEGER NOT NULL
+            )'
+        );
+
         return $pdo;
+    }
+
+    public static function compartilharVeiculo(PDO $pdo, int $veiculoId, int $usuarioId): void
+    {
+        $stmt = $pdo->prepare('INSERT INTO veiculo_compartilhamentos (veiculo_id, usuario_id) VALUES (:veiculo_id, :usuario_id)');
+        $stmt->execute([':veiculo_id' => $veiculoId, ':usuario_id' => $usuarioId]);
     }
 
     public static function inserirUsuario(PDO $pdo, array $dados = []): int
