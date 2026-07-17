@@ -10,9 +10,7 @@ $usuario = exigirLogin();
 // permitido, já existe à parte e não depende dessa flag.
 $telaPrincipal = true;
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 
 $veiculoIdFiltro = filter_input(INPUT_GET, 'veiculo_id', FILTER_VALIDATE_INT) ?: null;
 
@@ -37,10 +35,10 @@ if ($ultimaMedia === null) {
     $totalAbastecimentosStmt = $pdo->prepare(
         'SELECT COUNT(*) FROM registros r
          INNER JOIN veiculos v ON v.id = r.veiculo_id
-         WHERE v.usuario_id = :usuario_id AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL'
+         WHERE ' . condicaoAcessoVeiculo('v') . ' AND r.tipo_registro = "Abastecimento" AND r.litros IS NOT NULL'
         . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
     );
-    $totalAbastecimentosStmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+    bindAcessoVeiculo($totalAbastecimentosStmt, $usuario['id']);
     if ($veiculoIdFiltro !== null) {
         $totalAbastecimentosStmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
     }
@@ -54,8 +52,10 @@ if ($ultimaMedia === null) {
 
 $autonomiaKm = null;
 if ($veiculoParaAutonomia !== null && $ultimaMedia !== null) {
-    $tanqueStmt = $pdo->prepare('SELECT tanque_litros FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-    $tanqueStmt->execute([':id' => $veiculoParaAutonomia, ':usuario_id' => $usuario['id']]);
+    $tanqueStmt = $pdo->prepare('SELECT tanque_litros FROM veiculos v WHERE v.id = :id AND ' . condicaoAcessoVeiculo('v'));
+    $tanqueStmt->bindValue(':id', $veiculoParaAutonomia, PDO::PARAM_INT);
+    bindAcessoVeiculo($tanqueStmt, $usuario['id']);
+    $tanqueStmt->execute();
     $tanqueLitros = $tanqueStmt->fetchColumn();
     if ($tanqueLitros !== false && $tanqueLitros !== null) {
         $autonomiaKm = (int) round((float) $tanqueLitros * $ultimaMedia);
@@ -67,9 +67,10 @@ $lembretesStmt = $pdo->prepare(
             (SELECT MAX(r.km_atual) FROM registros r WHERE r.veiculo_id = l.veiculo_id) AS km_atual_veiculo
      FROM lembretes l
      INNER JOIN veiculos v ON v.id = l.veiculo_id
-     WHERE v.usuario_id = :usuario_id AND l.concluido_em IS NULL"
+     WHERE " . condicaoAcessoVeiculo('v') . " AND l.concluido_em IS NULL"
 );
-$lembretesStmt->execute([':usuario_id' => $usuario['id']]);
+bindAcessoVeiculo($lembretesStmt, $usuario['id']);
+$lembretesStmt->execute();
 $lembretesAtencao = array_values(array_filter(
     array_map(static function ($l) {
         $status = calcularStatusLembrete($l)['status'];
@@ -93,12 +94,12 @@ $alertasNaoLidos = $alertasStmt->fetchAll();
 $sqlRegistros = 'SELECT r.id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.categoria_despesa, r.valor_pago, r.descricao, v.nome AS veiculo_nome
                   FROM registros r
                   INNER JOIN veiculos v ON v.id = r.veiculo_id
-                  WHERE v.usuario_id = :usuario_id'
+                  WHERE ' . condicaoAcessoVeiculo('v')
     . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '')
     . ' ORDER BY r.data DESC, r.id DESC LIMIT 10';
 
 $stmt = $pdo->prepare($sqlRegistros);
-$stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+bindAcessoVeiculo($stmt, $usuario['id']);
 if ($veiculoIdFiltro !== null) {
     $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
 }
@@ -108,11 +109,11 @@ $registros = $stmt->fetchAll();
 $sqlGastoMes = 'SELECT COALESCE(SUM(r.valor_pago), 0)
                  FROM registros r
                  INNER JOIN veiculos v ON v.id = r.veiculo_id
-                 WHERE v.usuario_id = :usuario_id
+                 WHERE ' . condicaoAcessoVeiculo('v') . '
                    AND DATE_FORMAT(r.data, "%Y-%m") = DATE_FORMAT(CURDATE(), "%Y-%m")'
     . ($veiculoIdFiltro !== null ? ' AND r.veiculo_id = :veiculo_id' : '');
 $stmt = $pdo->prepare($sqlGastoMes);
-$stmt->bindValue(':usuario_id', $usuario['id'], PDO::PARAM_INT);
+bindAcessoVeiculo($stmt, $usuario['id']);
 if ($veiculoIdFiltro !== null) {
     $stmt->bindValue(':veiculo_id', $veiculoIdFiltro, PDO::PARAM_INT);
 }
