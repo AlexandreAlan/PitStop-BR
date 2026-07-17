@@ -15,9 +15,11 @@ $stmt = $pdo->prepare(
     'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.tanque_cheio, r.categoria_despesa, r.valor_pago, r.descricao
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
-     WHERE r.id = :id AND v.usuario_id = :usuario_id'
+     WHERE r.id = :id AND ' . condicaoAcessoVeiculo('v')
 );
-$stmt->execute([':id' => $id, ':usuario_id' => $usuario['id']]);
+$stmt->bindValue(':id', $id, PDO::PARAM_INT);
+bindAcessoVeiculo($stmt, $usuario['id']);
+$stmt->execute();
 $registro = $stmt->fetch();
 
 if (!$registro) {
@@ -25,9 +27,7 @@ if (!$registro) {
     die('Registro não encontrado.');
 }
 
-$veiculosStmt = $pdo->prepare('SELECT id, nome, tipo FROM veiculos WHERE usuario_id = :usuario_id ORDER BY nome');
-$veiculosStmt->execute([':usuario_id' => $usuario['id']]);
-$veiculos = $veiculosStmt->fetchAll();
+$veiculos = veiculosAcessiveis($pdo, $usuario['id']);
 
 $combustiveisPermitidos = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
 $categoriasDespesaPermitidas = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
@@ -71,12 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$veiculoId) {
         $erros[] = 'Selecione um veículo válido.';
-    } else {
-        $existe = $pdo->prepare('SELECT 1 FROM veiculos WHERE id = :id AND usuario_id = :usuario_id');
-        $existe->execute([':id' => $veiculoId, ':usuario_id' => $usuario['id']]);
-        if (!$existe->fetchColumn()) {
-            $erros[] = 'Veículo não encontrado.';
-        }
+    } elseif (!usuarioTemAcessoVeiculo($pdo, $usuario['id'], $veiculoId)) {
+        $erros[] = 'Veículo não encontrado.';
     }
     if (!$dataRegistro || $dataRegistro->format('Y-m-d') !== $dados['data']) {
         $erros[] = 'Data inválida.';
@@ -113,22 +109,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  r.tipo_registro = :tipo_registro, r.combustivel = :combustivel, r.litros = :litros,
                  r.tanque_cheio = :tanque_cheio,
                  r.categoria_despesa = :categoria_despesa, r.valor_pago = :valor_pago, r.descricao = :descricao
-             WHERE r.id = :id AND v.usuario_id = :usuario_id'
+             WHERE r.id = :id AND ' . condicaoAcessoVeiculo('v')
         );
-        $upd->execute([
-            ':veiculo_id'        => $veiculoId,
-            ':data'              => $dataRegistro->format('Y-m-d'),
-            ':km_atual'          => $kmAtual,
-            ':tipo_registro'     => $tipoRegistro,
-            ':combustivel'       => $tipoRegistro === 'Abastecimento' ? $combustivel : null,
-            ':litros'            => $tipoRegistro === 'Abastecimento' ? $litros : null,
-            ':tanque_cheio'      => $tipoRegistro === 'Abastecimento' ? ($tanqueCheio ? 1 : 0) : 1,
-            ':categoria_despesa' => $tipoRegistro === 'Despesa' ? $categoriaDespesa : null,
-            ':valor_pago'        => $valorPago,
-            ':descricao'         => $dados['descricao'] !== '' ? $dados['descricao'] : null,
-            ':id'                => $id,
-            ':usuario_id'        => $usuario['id'],
-        ]);
+        $upd->bindValue(':veiculo_id', $veiculoId, PDO::PARAM_INT);
+        $upd->bindValue(':data', $dataRegistro->format('Y-m-d'));
+        $upd->bindValue(':km_atual', $kmAtual, PDO::PARAM_INT);
+        $upd->bindValue(':tipo_registro', $tipoRegistro);
+        $upd->bindValue(':combustivel', $tipoRegistro === 'Abastecimento' ? $combustivel : null);
+        $upd->bindValue(':litros', $tipoRegistro === 'Abastecimento' ? $litros : null);
+        $upd->bindValue(':tanque_cheio', $tipoRegistro === 'Abastecimento' ? ($tanqueCheio ? 1 : 0) : 1, PDO::PARAM_INT);
+        $upd->bindValue(':categoria_despesa', $tipoRegistro === 'Despesa' ? $categoriaDespesa : null);
+        $upd->bindValue(':valor_pago', $valorPago);
+        $upd->bindValue(':descricao', $dados['descricao'] !== '' ? $dados['descricao'] : null);
+        $upd->bindValue(':id', $id, PDO::PARAM_INT);
+        bindAcessoVeiculo($upd, $usuario['id']);
+        $upd->execute();
 
         flashSet('sucesso', 'Registro atualizado com sucesso.');
         header('Location: index.php');
