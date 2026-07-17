@@ -312,6 +312,23 @@ CREATE TABLE IF NOT EXISTS veiculo_convites (
     INDEX idx_veiculo_convites_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Foto de comprovante anexada a um registro — ver
+-- db/migrations/0009_registro_fotos.sql (BLOB no MySQL, não em disco: o
+-- container web roda read_only sem volume gravável).
+CREATE TABLE IF NOT EXISTS registro_fotos (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    registro_id INT UNSIGNED NOT NULL,
+    mime_type VARCHAR(30) NOT NULL,
+    tamanho_bytes INT UNSIGNED NOT NULL,
+    dados MEDIUMBLOB NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_registro_fotos_registro
+        FOREIGN KEY (registro_id) REFERENCES registros(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_registro_fotos_registro (registro_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- "Passaporte do veículo": link público (sem login), read-only, com o
 -- histórico completo de um veículo — ver db/migrations/0007_veiculo_passaportes.sql.
 CREATE TABLE IF NOT EXISTS veiculo_passaportes (
