@@ -18,7 +18,12 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
 
 ## Funcionalidades
 
-- Multi-usuário: cada conta só enxerga e mexe nos próprios veículos/registros
+- Multi-usuário: cada conta só enxerga e mexe nos próprios veículos/registros, com a opção de
+  **compartilhar um veículo** com outra conta (ex.: casal dividindo o mesmo carro/moto) — convite
+  por e-mail (token de uso único, 7 dias), o colaborador enxerga o histórico completo do veículo e
+  pode registrar/editar normalmente; só o dono edita os dados do veículo e gerencia quem tem
+  acesso, e tanto o dono quanto o colaborador podem encerrar o compartilhamento a qualquer momento
+  (`veiculos.php` → ícone de pessoas)
 - Cadastro aberto com confirmação de e-mail (código de 6 dígitos, válido por 15 min, com limite de
   tentativas e reenvio), rate limit de 5 cadastros por hora por IP; também dá pra entrar por
   convite de quem já usa o app (link com token de uso único e validade de 7 dias, e-mail
@@ -60,6 +65,26 @@ acompanhar consumo (km/l) e gastos. Acesse em **https://pitstop.morenadoaco.com.
   quando o veículo tem modelo do catálogo vinculado, e tabela comparando consumo/custo por
   km/gasto entre todos os veículos de quem tem 2 ou mais cadastrados
 - Filtro de registros e relatórios por veículo
+- **Passaporte do veículo**: link público, somente leitura e sem necessidade de login, com o
+  histórico completo (abastecimentos, manutenções, despesas) de um único veículo — útil pra provar
+  procedência na hora de vender. Token de 32 bytes aleatórios (não sequencial, só o hash fica no
+  banco), sempre revogável e regenerável pelo dono a qualquer momento (`veiculos.php` → ícone de
+  QR code); reaproveita a mesma exportação em PDF (impressão do navegador) já usada em Relatórios
+- **Foto de comprovante**: anexo opcional (nota fiscal/recibo) num registro, compactado no
+  aparelho (canvas) antes de enviar; funciona offline (entra na mesma fila de sincronização) e é
+  guardado como BLOB no MySQL (o container web roda com filesystem somente leitura, sem volume
+  pra receber upload de arquivo)
+- **Importação de histórico via CSV**: caminho inverso da exportação de Relatórios — escolhe um
+  arquivo, o app mostra uma prévia linha a linha (o que vai ser importado e o que tem erro, e por
+  quê) antes de confirmar, com a opção de pular só as linhas com problema ou abortar tudo
+- **Postos de combustível**: cadastro pessoal de postos (nome, localização opcional, favoritos),
+  vínculo opcional num abastecimento e comparação do preço médio por litro entre postos em
+  Relatórios
+- **Benchmark anônimo**: em Relatórios, com um veículo selecionado, compara o consumo médio dele
+  com a média de outros veículos parecidos (mesmo tipo — Moto/Carro/Outro — e mesmo combustível,
+  pra não misturar consumo de gasolina com etanol/diesel/GNV); sempre agregado — nunca mostra o
+  consumo de nenhum outro veículo/conta individualmente, e só aparece com pelo menos 5 outros
+  veículos no mesmo segmento
 - Conformidade com a LGPD: política de privacidade, aceite de consentimento obrigatório no
   cadastro/convite e exclusão definitiva da própria conta e dados (direito ao esquecimento)
 - Identidade visual própria (paleta laranja + teal, logo, favicons), com medidor (gauge) de
@@ -92,7 +117,8 @@ pitstop-br/
 ├── phpunit.xml              # config do PHPUnit (bootstrap, suítes Unit/Integration)
 ├── .env                    # credenciais (gitignored, gerado localmente)
 ├── db/
-│   └── init.sql            # schema + seed inicial
+│   ├── init.sql            # schema + seed inicial (sempre reconciliado com as migrações abaixo)
+│   └── migrations/         # alterações incrementais de schema (aplicação manual, ver cada arquivo)
 ├── docker/php/
 │   ├── Dockerfile          # imagem PHP+Apache hardenizada
 │   ├── php.ini             # hardening PHP (expose_php off, sessão segura, sem upload...)
@@ -136,7 +162,12 @@ pitstop-br/
     │                       # veículos, atalhos de período; filtro por período; export CSV/PDF
     ├── adicionar.php / registro_editar.php / excluir.php   # CRUD de registros (abastecimento/manutenção/despesa)
     ├── lembretes.php / lembrete_concluir.php / lembrete_excluir.php   # lembretes de manutenção (km ou data)
-    └── veiculos.php / veiculo_editar.php / veiculo_excluir.php   # CRUD de veículos
+    ├── veiculos.php / veiculo_editar.php / veiculo_excluir.php   # CRUD de veículos
+    ├── veiculo_compartilhar.php / veiculo_convite.php   # convidar/remover colaborador de um veículo e aceite do convite
+    ├── passaporte.php / passaporte_publico.php   # gerar/revogar o link público do veículo, e a página pública em si
+    ├── postos.php / posto_excluir.php   # cadastro/favoritos de postos de combustível
+    ├── importar.php   # importação de histórico via CSV (preview linha a linha, pular ou abortar em erro)
+    └── foto.php   # serve a foto de comprovante de um registro (BLOB, escopado ao dono/colaborador)
 ```
 
 ## Segurança aplicada
@@ -149,7 +180,23 @@ pitstop-br/
   falhas, mensagem de erro genérica no login (sem enumeração de e-mail), `session_regenerate_id`
   após login/cadastro
 - Isolamento multi-usuário: toda consulta/gravação de veículo e registro é restrita por
-  `usuario_id` (via FK + `JOIN`/`WHERE`), prevenindo IDOR entre contas
+  `usuario_id` (via FK + `JOIN`/`WHERE`), prevenindo IDOR entre contas — com o compartilhamento de
+  veículo (`veiculo_compartilhamentos`), essa condição passou a aceitar dono OU colaborador
+  aceito (`condicaoAcessoVeiculo()`/`usuarioTemAcessoVeiculo()` em `includes/functions.php`), nunca
+  um terceiro sem relação alguma com o veículo
+- Passaporte do veículo: link público protegido só pelo token (32 bytes aleatórios, não
+  sequencial), com o banco guardando apenas o hash SHA-256 — a página pública
+  (`passaporte_publico.php`) resolve o veículo exclusivamente a partir do token e nunca aceita um
+  `veiculo_id` direto na URL, então não há como um link vazar dado de outro veículo trocando um
+  número; gerar um novo link revoga o anterior automaticamente, e só o dono do veículo pode gerar
+  ou revogar
+- Foto de comprovante: nunca confia no MIME que o cliente informa — valida o conteúdo real do
+  arquivo (`finfo`) e um limite de tamanho no servidor além da compressão do cliente; servida
+  (`foto.php`) sempre escopada ao dono/colaborador do veículo do registro
+- Benchmark anônimo: a query que varre veículos de outras contas nunca é exposta por
+  dono/veículo — só o agregado (média/percentil) sai da função, e um limiar mínimo de amostra (5
+  outros veículos no mesmo segmento) evita que a "média" vire, na prática, o dado de uma conta
+  específica quando a amostra é pequena demais
 - Confirmação de e-mail: código de 6 dígitos, armazenado só como hash SHA-256 (nunca em texto
   plano), validade de 15 min, limite de tentativas e rate limit de reenvio; sem essa confirmação
   a conta não consegue logar
@@ -308,6 +355,14 @@ release. Basta então atualizar a tabela abaixo (histórico técnico, mais detal
 mesmo commit.
 
 ## Histórico de Versões
+
+> **Pendente de versão** (implementado e testado, aguardando o dono do projeto decidir quando dar
+> bump/lançar): seis funcionalidades novas — passaporte do veículo (link público read-only via
+> token), compartilhamento de veículo entre contas, foto de comprovante nos registros (com suporte
+> offline), importação de histórico via CSV, postos de combustível (favoritos + comparação de
+> preço médio) e benchmark anônimo de consumo. Ver `db/migrations/0007` a `0010` pro schema novo
+> (precisa ser aplicado manualmente antes do deploy, ver cada arquivo) e as seções acima
+> (Funcionalidades, Estrutura de pastas, Segurança aplicada) pro detalhe de cada uma.
 
 | Versão | Data       | Descrição                                                                 |
 |--------|------------|-----------------------------------------------------------------------------|
