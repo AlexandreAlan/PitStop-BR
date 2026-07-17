@@ -12,7 +12,7 @@ if (!$id) {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.litros, r.tanque_cheio, r.categoria_despesa, r.valor_pago, r.descricao
+    'SELECT r.id, r.veiculo_id, r.data, r.km_atual, r.tipo_registro, r.combustivel, r.posto_id, r.litros, r.tanque_cheio, r.categoria_despesa, r.valor_pago, r.descricao
      FROM registros r
      INNER JOIN veiculos v ON v.id = r.veiculo_id
      WHERE r.id = :id AND ' . condicaoAcessoVeiculo('v')
@@ -28,6 +28,7 @@ if (!$registro) {
 }
 
 $veiculos = veiculosAcessiveis($pdo, $usuario['id']);
+$postos = listarPostos($pdo, $usuario['id']);
 
 $combustiveisPermitidos = ['Gasolina Comum', 'Gasolina Aditivada', 'Etanol', 'Diesel', 'GNV', 'Outro'];
 $categoriasDespesaPermitidas = ['Seguro', 'IPVA', 'Estacionamento', 'Pedagio', 'Multa', 'Lavagem', 'Outro'];
@@ -39,6 +40,7 @@ $dados = [
     'km_atual'          => (string) $registro['km_atual'],
     'tipo_registro'     => $registro['tipo_registro'],
     'combustivel'       => (string) $registro['combustivel'],
+    'posto_id'          => $registro['posto_id'] !== null ? (string) $registro['posto_id'] : '',
     'litros'            => $registro['litros'] !== null ? (string) $registro['litros'] : '',
     'tanque_cheio'      => (string) (int) $registro['tanque_cheio'],
     'categoria_despesa' => (string) $registro['categoria_despesa'],
@@ -54,11 +56,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dados['km_atual']          = (string) ($_POST['km_atual'] ?? '');
     $dados['tipo_registro']     = (string) ($_POST['tipo_registro'] ?? '');
     $dados['combustivel']       = (string) ($_POST['combustivel'] ?? '');
+    $dados['posto_id']          = (string) ($_POST['posto_id'] ?? '');
     $dados['litros']            = (string) ($_POST['litros'] ?? '');
     $dados['tanque_cheio']      = isset($_POST['tanque_cheio']) ? '1' : '0';
     $dados['categoria_despesa'] = (string) ($_POST['categoria_despesa'] ?? '');
     $dados['valor_pago']        = (string) ($_POST['valor_pago'] ?? '');
     $dados['descricao']         = trim((string) ($_POST['descricao'] ?? ''));
+
+    $postoId = null;
+    if ($dados['posto_id'] !== '') {
+        $postoIdCandidato = filter_var($dados['posto_id'], FILTER_VALIDATE_INT);
+        $existePosto = $pdo->prepare('SELECT 1 FROM postos WHERE id = :id AND usuario_id = :usuario_id');
+        $existePosto->execute([':id' => $postoIdCandidato, ':usuario_id' => $usuario['id']]);
+        if (!$postoIdCandidato || !$existePosto->fetchColumn()) {
+            $erros[] = 'Posto inválido.';
+        } else {
+            $postoId = $postoIdCandidato;
+        }
+    }
 
     $veiculoId        = filter_var($dados['veiculo_id'], FILTER_VALIDATE_INT);
     $kmAtual          = filter_var($dados['km_atual'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
@@ -106,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'UPDATE registros r
              INNER JOIN veiculos v ON v.id = r.veiculo_id
              SET r.veiculo_id = :veiculo_id, r.data = :data, r.km_atual = :km_atual,
-                 r.tipo_registro = :tipo_registro, r.combustivel = :combustivel, r.litros = :litros,
+                 r.tipo_registro = :tipo_registro, r.combustivel = :combustivel, r.posto_id = :posto_id, r.litros = :litros,
                  r.tanque_cheio = :tanque_cheio,
                  r.categoria_despesa = :categoria_despesa, r.valor_pago = :valor_pago, r.descricao = :descricao
              WHERE r.id = :id AND ' . condicaoAcessoVeiculo('v')
@@ -116,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd->bindValue(':km_atual', $kmAtual, PDO::PARAM_INT);
         $upd->bindValue(':tipo_registro', $tipoRegistro);
         $upd->bindValue(':combustivel', $tipoRegistro === 'Abastecimento' ? $combustivel : null);
+        $upd->bindValue(':posto_id', $tipoRegistro === 'Abastecimento' ? $postoId : null, PDO::PARAM_INT);
         $upd->bindValue(':litros', $tipoRegistro === 'Abastecimento' ? $litros : null);
         $upd->bindValue(':tanque_cheio', $tipoRegistro === 'Abastecimento' ? ($tanqueCheio ? 1 : 0) : 1, PDO::PARAM_INT);
         $upd->bindValue(':categoria_despesa', $tipoRegistro === 'Despesa' ? $categoriaDespesa : null);
@@ -217,6 +233,21 @@ require __DIR__ . '/includes/header.php';
         <label class="form-check-label" for="tanqueCheio">Encheu o tanque</label>
         <div class="form-text">Desmarque se foi só um complemento — sem isso o km/l fica errado.</div>
     </div>
+
+    <?php if ($postos): ?>
+    <div class="mb-3 campo-abastecimento <?= $dados['tipo_registro'] !== 'Abastecimento' ? 'd-none' : '' ?>">
+        <label class="form-label">Posto (opcional)</label>
+        <select name="posto_id" class="form-select form-select-lg">
+            <option value="">Não informado</option>
+            <?php foreach ($postos as $p): ?>
+            <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $dados['posto_id'] ? 'selected' : '' ?>>
+                <?= $p['favorito'] ? '★ ' : '' ?><?= h($p['nome']) ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        <div class="form-text"><a href="postos.php">Gerenciar postos</a></div>
+    </div>
+    <?php endif; ?>
 
     <div class="mb-3 campo-despesa <?= $dados['tipo_registro'] !== 'Despesa' ? 'd-none' : '' ?>">
         <label class="form-label">Categoria da Despesa</label>
